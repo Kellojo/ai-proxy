@@ -50,6 +50,11 @@
   }
 
   async function rerollKey(id: string) {
+    const confirmed = window.confirm(
+      "Reroll this key? The previous key value will stop working.",
+    );
+    if (!confirmed) return;
+
     const res = await fetch(`/api/virtual-keys/${id}/reroll`, {
       method: "POST",
     });
@@ -86,6 +91,11 @@
   }
 
   async function deleteKey(id: string) {
+    const confirmed = window.confirm(
+      "Delete this key? This action cannot be undone.",
+    );
+    if (!confirmed) return;
+
     await fetch(`/api/virtual-keys/${id}`, { method: "DELETE" });
     await loadKeys();
   }
@@ -151,7 +161,7 @@
                       <button class="alt" on:click={() => rerollKey(key.id)}
                         >Reroll</button
                       >
-                      <button class="ghost" on:click={() => deleteKey(key.id)}
+                      <button class="danger" on:click={() => deleteKey(key.id)}
                         >Delete</button
                       >
                     </div>

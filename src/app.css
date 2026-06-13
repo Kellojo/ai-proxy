@@ -202,11 +202,7 @@ button {
   border-radius: 8px;
   padding: 0.46rem 0.82rem;
   cursor: pointer;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--accent) 82%, #b28aff 18%) 0%,
-    color-mix(in srgb, var(--accent-2) 86%, #6a44ba 14%) 100%
-  );
+  background-color: color-mix(in srgb, var(--accent) 82%, #b28aff 18%);
   color: #ffffff;
   font-weight: 600;
   transition:
@@ -233,6 +229,16 @@ button.ghost {
   border: 1px solid color-mix(in srgb, var(--line) 65%, var(--glass-border));
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+}
+
+button.danger {
+  border-color: color-mix(in srgb, var(--error) 62%, var(--borderColor));
+  background-color: color-mix(in srgb, var(--error) 86%, #ffb0b0 14%);
+  color: #ffffff;
+}
+
+button.danger:hover {
+  filter: brightness(1.08);
 }
 
 .row {

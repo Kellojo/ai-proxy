@@ -1,0 +1,16 @@
+services:
+  ai-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-proxy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 3000
+      DATABASE_PATH: /app/data/ai-proxy.db
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

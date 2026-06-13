@@ -77,6 +77,11 @@
   }
 
   async function removeProvider(id: string) {
+    const confirmed = window.confirm(
+      "Delete this provider? This action cannot be undone.",
+    );
+    if (!confirmed) return;
+
     await fetch(`/api/providers/${id}`, { method: "DELETE" });
     await loadProviders();
   }
@@ -195,7 +200,7 @@
                         on:click={() => openEditProvider(provider)}>Edit</button
                       >
                       <button
-                        class="ghost"
+                        class="danger"
                         on:click={() => removeProvider(provider.id)}
                         >Delete</button
                       >
