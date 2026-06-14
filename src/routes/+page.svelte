@@ -25,13 +25,35 @@
     return value;
   }
 
+  function formatTokens(value: unknown) {
+    const amount = Number(value);
+    return Number.isFinite(amount) ? amount.toLocaleString() : "-";
+  }
+
+  function formatCost(value: unknown) {
+    const amount = Number(value);
+    return Number.isFinite(amount) ? `$${amount.toFixed(6)}` : "-";
+  }
+
   function totalRequests() {
+    if (stats?.summary?.request_count != null) {
+      return Number(stats.summary.request_count) || 0;
+    }
+
     if (!stats?.providerUsage?.length) return 0;
     return stats.providerUsage.reduce(
       (sum: number, row: { request_count: number }) =>
         sum + (row.request_count || 0),
       0,
     );
+  }
+
+  function totalTokens() {
+    return Number(stats?.summary?.total_tokens || 0);
+  }
+
+  function totalCost() {
+    return Number(stats?.summary?.total_cost || 0);
   }
 
   function activeProviders() {
@@ -271,18 +293,28 @@
         <p class="muted">Loading...</p>
       </section>
     {:else}
-      <article class="card span-4 stack">
-        <div class="muted">Total Requests</div>
-        <div class="stat-value">{totalRequests()}</div>
-      </article>
-      <article class="card span-4 stack">
-        <div class="muted">Providers in Use</div>
-        <div class="stat-value">{activeProviders()}</div>
-      </article>
-      <article class="card span-4 stack">
-        <div class="muted">Models Seen</div>
-        <div class="stat-value">{activeModels()}</div>
-      </article>
+      <section class="span-12 top-stats" aria-label="Summary statistics">
+        <article class="card stack">
+          <div class="muted">Total Requests</div>
+          <div class="stat-value">{totalRequests()}</div>
+        </article>
+        <article class="card stack">
+          <div class="muted">Total Tokens</div>
+          <div class="stat-value">{formatTokens(totalTokens())}</div>
+        </article>
+        <article class="card stack">
+          <div class="muted">Total Cost</div>
+          <div class="stat-value">{formatCost(totalCost())}</div>
+        </article>
+        <article class="card stack">
+          <div class="muted">Providers in Use</div>
+          <div class="stat-value">{activeProviders()}</div>
+        </article>
+        <article class="card stack">
+          <div class="muted">Models Seen</div>
+          <div class="stat-value">{activeModels()}</div>
+        </article>
+      </section>
     {/if}
 
     <section class="card span-12 stack">
@@ -314,6 +346,8 @@
                 <th>Model</th>
                 <th>Status</th>
                 <th>Latency</th>
+                <th>Tokens</th>
+                <th>Cost</th>
               </tr>
             </thead>
             <tbody>
@@ -328,6 +362,8 @@
                     >
                   </td>
                   <td>{row.duration_ms} ms</td>
+                  <td>{formatTokens(row.total_tokens)}</td>
+                  <td>{formatCost(row.cost)}</td>
                 </tr>
               {/each}
             </tbody>

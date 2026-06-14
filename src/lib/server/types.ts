@@ -41,6 +41,10 @@ export interface RequestLog {
   model: string;
   statusCode: number;
   durationMs: number;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  cost?: number;
   virtualKeyId?: string;
   createdAt: string;
 }

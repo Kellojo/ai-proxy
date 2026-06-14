@@ -8,7 +8,7 @@ Minimal SvelteKit + TypeScript proxy for multiple AI providers with virtual API 
 - Optional Wake-on-LAN for provider before each request
 - Virtual key management in UI (create, update, delete, reroll)
 - OpenAI-compatible proxy endpoint at `/api/proxy/openai/v1/chat/completions`
-- Basic usage stats for providers, models, request timeline, and status codes
+- Basic usage stats for providers, models, request timeline, status codes, token usage, and API-reported cost (when available)
 - SQLite storage for easy portability
 
 ## Run locally

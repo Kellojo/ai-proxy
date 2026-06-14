@@ -87,6 +87,25 @@ if (providerIdColumn?.notnull === 1) {
   `);
 }
 
+const hasRequestLogColumn = (name: string) =>
+  requestLogColumns.some((column) => column.name === name);
+
+if (!hasRequestLogColumn("prompt_tokens")) {
+  db.exec("ALTER TABLE request_logs ADD COLUMN prompt_tokens INTEGER");
+}
+
+if (!hasRequestLogColumn("completion_tokens")) {
+  db.exec("ALTER TABLE request_logs ADD COLUMN completion_tokens INTEGER");
+}
+
+if (!hasRequestLogColumn("total_tokens")) {
+  db.exec("ALTER TABLE request_logs ADD COLUMN total_tokens INTEGER");
+}
+
+if (!hasRequestLogColumn("cost")) {
+  db.exec("ALTER TABLE request_logs ADD COLUMN cost REAL");
+}
+
 function mapProvider(row: any): Provider {
   return {
     id: row.id,
@@ -350,10 +369,26 @@ export function logRequest(input: {
   statusCode: number;
   durationMs: number;
   virtualKeyId?: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  cost?: number;
 }): void {
   db.prepare(
-    `INSERT INTO request_logs (id, provider_id, model, status_code, duration_ms, virtual_key_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO request_logs (
+      id,
+      provider_id,
+      model,
+      status_code,
+      duration_ms,
+      virtual_key_id,
+      prompt_tokens,
+      completion_tokens,
+      total_tokens,
+      cost,
+      created_at
+    )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     randomUUID(),
     input.providerId || null,
@@ -361,11 +396,25 @@ export function logRequest(input: {
     input.statusCode,
     input.durationMs,
     input.virtualKeyId || null,
+    input.promptTokens ?? null,
+    input.completionTokens ?? null,
+    input.totalTokens ?? null,
+    input.cost ?? null,
     new Date().toISOString(),
   );
 }
 
 export function getStats() {
+  const summary = db
+    .prepare(
+      `SELECT
+            COUNT(*) AS request_count,
+            COALESCE(SUM(total_tokens), 0) AS total_tokens,
+            COALESCE(SUM(cost), 0) AS total_cost
+       FROM request_logs`,
+    )
+    .get();
+
   const providerUsage = db
     .prepare(
       `SELECT p.id, p.name, COUNT(r.id) AS request_count
@@ -403,6 +452,7 @@ export function getStats() {
   const recentRequests = db
     .prepare(
       `SELECT r.created_at, r.status_code, r.model, r.duration_ms,
+      r.prompt_tokens, r.completion_tokens, r.total_tokens, r.cost,
             COALESCE(p.name, 'Unauthenticated') AS provider_name
      FROM request_logs r
      LEFT JOIN providers p ON p.id = r.provider_id
@@ -412,6 +462,7 @@ export function getStats() {
     .all();
 
   return {
+    summary,
     providerUsage,
     modelUsage,
     requestsTimeline,

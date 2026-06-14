@@ -146,6 +146,10 @@ h3 {
   grid-template-columns: repeat(12, 1fr);
 }
 
+.span-12 {
+  grid-column: span 12;
+}
+
 .card {
   grid-column: span 12;
   border: 1px solid var(--borderColor);
@@ -505,6 +509,19 @@ a:hover {
   font-size: 1.55rem;
   font-weight: 700;
   letter-spacing: 0.01em;
+}
+
+.top-stats {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  scrollbar-width: thin;
+}
+
+.top-stats > .card {
+  min-width: 180px;
+  flex: 1 0 180px;
 }
 
 .table-wrap {

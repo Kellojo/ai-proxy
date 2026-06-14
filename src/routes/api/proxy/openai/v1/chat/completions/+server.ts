@@ -11,6 +11,57 @@ import { extractBearer } from "$lib/server/keys";
 import { forwardChatCompletion } from "$lib/server/proxy";
 import { sendWakeOnLan } from "$lib/server/wol";
 
+function readNumericValue(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
+function extractUsageMetrics(payload: any): {
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  cost?: number;
+} {
+  const usage = payload?.usage || {};
+
+  const promptTokens =
+    readNumericValue(usage?.prompt_tokens) ??
+    readNumericValue(usage?.input_tokens) ??
+    readNumericValue(usage?.promptTokens) ??
+    readNumericValue(usage?.inputTokens);
+
+  const completionTokens =
+    readNumericValue(usage?.completion_tokens) ??
+    readNumericValue(usage?.output_tokens) ??
+    readNumericValue(usage?.completionTokens) ??
+    readNumericValue(usage?.outputTokens);
+
+  const totalTokens =
+    readNumericValue(usage?.total_tokens) ??
+    readNumericValue(usage?.totalTokens) ??
+    (() => {
+      const combined = (promptTokens ?? 0) + (completionTokens ?? 0);
+      return combined > 0 ? combined : undefined;
+    })();
+
+  const cost =
+    readNumericValue(usage?.cost) ??
+    readNumericValue(usage?.total_cost) ??
+    readNumericValue(payload?.cost) ??
+    readNumericValue(payload?.total_cost);
+
+  return {
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    cost,
+  };
+}
+
 export const POST: RequestHandler = async ({ request }) => {
   const startedAt = Date.now();
   const body = await request.json().catch(() => ({}));
@@ -101,20 +152,20 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   const statusCode = upstream.status;
-  logRequest({
-    providerId: provider.id,
-    model,
-    statusCode,
-    durationMs: Date.now() - startedAt,
-    virtualKeyId: virtualKey.id,
-  });
-
   const upstreamContentType = upstream.headers.get("content-type") || "";
   const isEventStream = upstreamContentType
     .toLowerCase()
     .includes("text/event-stream");
 
   if (streamRequested && isEventStream) {
+    logRequest({
+      providerId: provider.id,
+      model,
+      statusCode,
+      durationMs: Date.now() - startedAt,
+      virtualKeyId: virtualKey.id,
+    });
+
     return new Response(upstream.body, {
       status: statusCode,
       headers: {
@@ -126,6 +177,23 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   const text = await upstream.text();
+  let metrics: ReturnType<typeof extractUsageMetrics> = {};
+  try {
+    const payload = JSON.parse(text);
+    metrics = extractUsageMetrics(payload);
+  } catch {
+    metrics = {};
+  }
+
+  logRequest({
+    providerId: provider.id,
+    model,
+    statusCode,
+    durationMs: Date.now() - startedAt,
+    virtualKeyId: virtualKey.id,
+    ...metrics,
+  });
+
   return new Response(text, {
     status: statusCode,
     headers: {
