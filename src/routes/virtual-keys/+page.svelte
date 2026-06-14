@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
 
   type VirtualKey = {
     id: string;
@@ -11,10 +11,17 @@
   };
 
   let keys: VirtualKey[] = [];
+  const DIALOG_ANIMATION_MS = 140;
+
   let keyName = "";
   let message = "";
   let error = "";
+  let toastMessage = "";
   let showCreateModal = false;
+  let createModalClosing = false;
+  let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  let createDialog: HTMLDialogElement | null = null;
 
   function formatTime(value?: string) {
     if (!value) return "-";
@@ -44,9 +51,45 @@
     }
 
     message = `Created key ${payload.key.name}`;
-    keyName = "";
-    showCreateModal = false;
+
+    if (payload.plaintext) {
+      try {
+        await navigator.clipboard.writeText(payload.plaintext);
+        showToast("Key copied to clipboard");
+      } catch {
+        showToast("Key created, but clipboard access failed");
+      }
+    }
+
+    closeCreateModal();
     await loadKeys();
+  }
+
+  function showToast(text: string) {
+    toastMessage = text;
+    if (toastTimeout) clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => {
+      toastMessage = "";
+      toastTimeout = null;
+    }, 1800);
+  }
+
+  function openCreateModal() {
+    createModalClosing = false;
+    keyName = "";
+    error = "";
+    showCreateModal = true;
+  }
+
+  function closeCreateModal() {
+    if (!showCreateModal || createModalClosing) return;
+    createModalClosing = true;
+
+    setTimeout(() => {
+      showCreateModal = false;
+      createModalClosing = false;
+      keyName = "";
+    }, DIALOG_ANIMATION_MS);
   }
 
   async function rerollKey(id: string) {
@@ -62,6 +105,16 @@
     if (res.ok) {
       message = `Rerolled key ${payload.key.name}`;
       error = "";
+
+      if (payload.plaintext) {
+        try {
+          await navigator.clipboard.writeText(payload.plaintext);
+          showToast("Rerolled key copied to clipboard");
+        } catch {
+          showToast("Key rerolled, but clipboard access failed");
+        }
+      }
+
       await loadKeys();
     } else {
       error = payload.error || "Failed to reroll key";
@@ -100,7 +153,21 @@
     await loadKeys();
   }
 
+  $: {
+    if (showCreateModal && createDialog && !createDialog.open) {
+      createDialog.showModal();
+    }
+
+    if (!showCreateModal && createDialog?.open) {
+      createDialog.close();
+    }
+  }
+
   onMount(loadKeys);
+
+  onDestroy(() => {
+    if (toastTimeout) clearTimeout(toastTimeout);
+  });
 </script>
 
 <main>
@@ -112,8 +179,9 @@
           Manage client-facing keys used to access proxy endpoints.
         </p>
       </div>
-      <button on:click={() => (showCreateModal = true)}>New Key</button>
+      <button on:click={openCreateModal}>New Key</button>
     </div>
+    {#if toastMessage}<div class="mini-toast">{toastMessage}</div>{/if}
     {#if message}<div class="notice">{message}</div>{/if}
     {#if error}<div class="error">{error}</div>{/if}
   </div>
@@ -175,54 +243,37 @@
     </section>
   </div>
 
-  {#if showCreateModal}
-    <div class="modal-backdrop" role="presentation">
-      <button
-        class="modal-dismiss"
-        type="button"
-        aria-label="Close create key dialog"
-        on:click={() => (showCreateModal = false)}
-      ></button>
+  <dialog
+    bind:this={createDialog}
+    class={`modal stack ${createModalClosing ? "is-closing" : ""}`}
+    aria-labelledby="create-key-title"
+    on:cancel|preventDefault={closeCreateModal}
+    on:click={(event) => {
+      if (event.currentTarget === event.target) closeCreateModal();
+    }}
+  >
+    <div class="modal-header">
+      <h2 id="create-key-title">Create Key</h2>
+    </div>
 
-      <div
-        class="modal stack"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-key-title"
-      >
-        <div class="modal-header">
-          <h2 id="create-key-title">Create Key</h2>
-          <button class="ghost" on:click={() => (showCreateModal = false)}
-            >Close</button
-          >
-        </div>
-
-        <div class="row">
-          <div style="flex: 1 1 260px;">
-            <label for="key-name">Key Name</label>
-            <input
-              id="key-name"
-              bind:value={keyName}
-              placeholder="Production client"
-            />
-          </div>
-          <div style="align-self: flex-end;">
-            <button class="alt" on:click|preventDefault={createVirtualKey}
-              >Create Key</button
-            >
-          </div>
-        </div>
-
-        <p class="muted">
-          Use Authorization: Bearer vk_xxx when calling proxy endpoints.
-        </p>
-
-        <div class="row" style="justify-content: flex-end;">
-          <button class="ghost" on:click={() => (showCreateModal = false)}
-            >Cancel</button
-          >
-        </div>
+    <div class="row">
+      <div style="flex: 1 1 260px;">
+        <label for="key-name">Key Name</label>
+        <input
+          id="key-name"
+          bind:value={keyName}
+          placeholder="Production client"
+        />
       </div>
     </div>
-  {/if}
+
+    <p class="muted">
+      Use Authorization: Bearer vk_xxx when calling proxy endpoints.
+    </p>
+
+    <div class="row modal-footer">
+      <button class="ghost" on:click={closeCreateModal}>Close</button>
+      <button on:click|preventDefault={createVirtualKey}>Create Key</button>
+    </div>
+  </dialog>
 </main>

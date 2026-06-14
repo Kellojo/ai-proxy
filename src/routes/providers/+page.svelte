@@ -16,9 +16,16 @@
   let providers: Provider[] = [];
   let message = "";
   let error = "";
+  const DIALOG_ANIMATION_MS = 140;
+
   let showCreateModal = false;
+  let createModalClosing = false;
   let showEditModal = false;
+  let editModalClosing = false;
   let editingProviderId = "";
+
+  let createDialog: HTMLDialogElement | null = null;
+  let editDialog: HTMLDialogElement | null = null;
 
   let providerForm = {
     name: "",
@@ -71,9 +78,24 @@
       name: "",
       apiKey: "",
     };
-    showCreateModal = false;
+    closeCreateModal();
 
     await loadProviders();
+  }
+
+  function openCreateModal() {
+    createModalClosing = false;
+    showCreateModal = true;
+  }
+
+  function closeCreateModal() {
+    if (!showCreateModal || createModalClosing) return;
+    createModalClosing = true;
+
+    setTimeout(() => {
+      showCreateModal = false;
+      createModalClosing = false;
+    }, DIALOG_ANIMATION_MS);
   }
 
   async function removeProvider(id: string) {
@@ -87,6 +109,7 @@
   }
 
   function openEditProvider(provider: Provider) {
+    editModalClosing = false;
     editingProviderId = provider.id;
     editForm = {
       name: provider.name,
@@ -100,6 +123,17 @@
       wolPort: provider.wolPort || 9,
     };
     showEditModal = true;
+  }
+
+  function closeEditModal() {
+    if (!showEditModal || editModalClosing) return;
+    editModalClosing = true;
+
+    setTimeout(() => {
+      showEditModal = false;
+      editModalClosing = false;
+      editingProviderId = "";
+    }, DIALOG_ANIMATION_MS);
   }
 
   async function saveProviderEdits() {
@@ -122,9 +156,28 @@
     }
 
     message = `Provider ${payload.provider.name} updated`;
-    showEditModal = false;
-    editingProviderId = "";
+    closeEditModal();
     await loadProviders();
+  }
+
+  $: {
+    if (showCreateModal && createDialog && !createDialog.open) {
+      createDialog.showModal();
+    }
+
+    if (!showCreateModal && createDialog?.open) {
+      createDialog.close();
+    }
+  }
+
+  $: {
+    if (showEditModal && editDialog && !editDialog.open) {
+      editDialog.showModal();
+    }
+
+    if (!showEditModal && editDialog?.open) {
+      editDialog.close();
+    }
   }
 
   onMount(loadProviders);
@@ -139,7 +192,7 @@
           Configure OpenAI, Anthropic, and OpenAI-compatible providers.
         </p>
       </div>
-      <button on:click={() => (showCreateModal = true)}>New Provider</button>
+      <button on:click={openCreateModal}>New Provider</button>
     </div>
     {#if message}<div class="notice">{message}</div>{/if}
     {#if error}<div class="error">{error}</div>{/if}
@@ -215,237 +268,209 @@
     </section>
   </div>
 
-  {#if showCreateModal}
-    <div class="modal-backdrop" role="presentation">
-      <button
-        class="modal-dismiss"
-        type="button"
-        aria-label="Close create provider dialog"
-        on:click={() => (showCreateModal = false)}
-      ></button>
+  <dialog
+    bind:this={createDialog}
+    class={`modal stack ${createModalClosing ? "is-closing" : ""}`}
+    aria-labelledby="create-provider-title"
+    on:cancel|preventDefault={closeCreateModal}
+    on:click={(event) => {
+      if (event.currentTarget === event.target) closeCreateModal();
+    }}
+  >
+    <div class="modal-header">
+      <h2 id="create-provider-title">Create Provider</h2>
+    </div>
 
-      <div
-        class="modal stack"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-provider-title"
-      >
-        <div class="modal-header">
-          <h2 id="create-provider-title">Create Provider</h2>
-          <button class="ghost" on:click={() => (showCreateModal = false)}
-            >Close</button
-          >
-        </div>
-
-        <div class="row">
-          <div style="flex: 1 1 230px;">
-            <label for="provider-name">Name</label>
-            <input
-              id="provider-name"
-              bind:value={providerForm.name}
-              placeholder="Main OpenAI"
-            />
-          </div>
-          <div style="flex: 1 1 200px;">
-            <label for="provider-kind">Kind</label>
-            <select id="provider-kind" bind:value={providerForm.kind}>
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="other">Other OpenAI-like</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="row">
-          <div style="flex: 1 1 260px;">
-            <label for="provider-endpoint">Endpoint URL</label>
-            <input
-              id="provider-endpoint"
-              bind:value={providerForm.endpointUrl}
-              placeholder="https://api.openai.com"
-            />
-          </div>
-          <div style="flex: 1 1 260px;">
-            <label for="provider-apikey">API Key / Token</label>
-            <input
-              id="provider-apikey"
-              bind:value={providerForm.apiKey}
-              type="password"
-              placeholder="sk-..."
-            />
-          </div>
-        </div>
-
-        <div class="row">
-          <label
-            ><input
-              type="checkbox"
-              bind:checked={providerForm.isDefault}
-              style="width:auto;"
-            /> Default provider</label
-          >
-          <label
-            ><input
-              type="checkbox"
-              bind:checked={providerForm.wolEnabled}
-              style="width:auto;"
-            /> Send Wake-on-LAN before requests</label
-          >
-        </div>
-
-        {#if providerForm.wolEnabled}
-          <div class="row">
-            <div style="flex: 1 1 220px;">
-              <label for="provider-wol-mac">WOL MAC</label>
-              <input
-                id="provider-wol-mac"
-                bind:value={providerForm.wolMac}
-                placeholder="00:11:22:33:44:55"
-              />
-            </div>
-            <div style="flex: 1 1 220px;">
-              <label for="provider-wol-broadcast">WOL Broadcast</label>
-              <input
-                id="provider-wol-broadcast"
-                bind:value={providerForm.wolBroadcast}
-              />
-            </div>
-            <div style="flex: 0 1 120px;">
-              <label for="provider-wol-port">WOL Port</label>
-              <input
-                id="provider-wol-port"
-                bind:value={providerForm.wolPort}
-                type="number"
-              />
-            </div>
-          </div>
-        {/if}
-
-        <div class="row" style="justify-content: flex-end;">
-          <button class="ghost" on:click={() => (showCreateModal = false)}
-            >Cancel</button
-          >
-          <button on:click|preventDefault={addProvider}>Save Provider</button>
-        </div>
+    <div class="row">
+      <div style="flex: 1 1 230px;">
+        <label for="provider-name">Name</label>
+        <input
+          id="provider-name"
+          bind:value={providerForm.name}
+          placeholder="Main OpenAI"
+        />
+      </div>
+      <div style="flex: 1 1 200px;">
+        <label for="provider-kind">Kind</label>
+        <select id="provider-kind" bind:value={providerForm.kind}>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="other">Other OpenAI-like</option>
+        </select>
       </div>
     </div>
-  {/if}
 
-  {#if showEditModal}
-    <div class="modal-backdrop" role="presentation">
-      <button
-        class="modal-dismiss"
-        type="button"
-        aria-label="Close edit provider dialog"
-        on:click={() => (showEditModal = false)}
-      ></button>
-
-      <div
-        class="modal stack"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="edit-provider-title"
-      >
-        <div class="modal-header">
-          <h2 id="edit-provider-title">Edit Provider</h2>
-          <button class="ghost" on:click={() => (showEditModal = false)}
-            >Close</button
-          >
-        </div>
-
-        <div class="row">
-          <div style="flex: 1 1 230px;">
-            <label for="edit-provider-name">Name</label>
-            <input
-              id="edit-provider-name"
-              bind:value={editForm.name}
-              placeholder="Main OpenAI"
-            />
-          </div>
-          <div style="flex: 1 1 200px;">
-            <label for="edit-provider-kind">Kind</label>
-            <select id="edit-provider-kind" bind:value={editForm.kind}>
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="other">Other OpenAI-like</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="row">
-          <div style="flex: 1 1 260px;">
-            <label for="edit-provider-endpoint">Endpoint URL</label>
-            <input
-              id="edit-provider-endpoint"
-              bind:value={editForm.endpointUrl}
-              placeholder="https://api.openai.com"
-            />
-          </div>
-          <div style="flex: 1 1 260px;">
-            <label for="edit-provider-apikey">API Key / Token (optional)</label>
-            <input
-              id="edit-provider-apikey"
-              bind:value={editForm.apiKey}
-              type="password"
-              placeholder="Leave blank to keep existing key"
-            />
-          </div>
-        </div>
-
-        <div class="row">
-          <label
-            ><input
-              type="checkbox"
-              bind:checked={editForm.isDefault}
-              style="width:auto;"
-            /> Default provider</label
-          >
-          <label
-            ><input
-              type="checkbox"
-              bind:checked={editForm.wolEnabled}
-              style="width:auto;"
-            /> Send Wake-on-LAN before requests</label
-          >
-        </div>
-
-        {#if editForm.wolEnabled}
-          <div class="row">
-            <div style="flex: 1 1 220px;">
-              <label for="edit-provider-wol-mac">WOL MAC</label>
-              <input
-                id="edit-provider-wol-mac"
-                bind:value={editForm.wolMac}
-                placeholder="00:11:22:33:44:55"
-              />
-            </div>
-            <div style="flex: 1 1 220px;">
-              <label for="edit-provider-wol-broadcast">WOL Broadcast</label>
-              <input
-                id="edit-provider-wol-broadcast"
-                bind:value={editForm.wolBroadcast}
-              />
-            </div>
-            <div style="flex: 0 1 120px;">
-              <label for="edit-provider-wol-port">WOL Port</label>
-              <input
-                id="edit-provider-wol-port"
-                bind:value={editForm.wolPort}
-                type="number"
-              />
-            </div>
-          </div>
-        {/if}
-
-        <div class="row" style="justify-content: flex-end;">
-          <button class="ghost" on:click={() => (showEditModal = false)}
-            >Cancel</button
-          >
-          <button on:click|preventDefault={saveProviderEdits}
-            >Save Changes</button
-          >
-        </div>
+    <div class="row">
+      <div style="flex: 1 1 260px;">
+        <label for="provider-endpoint">Endpoint URL</label>
+        <input
+          id="provider-endpoint"
+          bind:value={providerForm.endpointUrl}
+          placeholder="https://api.openai.com"
+        />
+      </div>
+      <div style="flex: 1 1 260px;">
+        <label for="provider-apikey">API Key / Token</label>
+        <input
+          id="provider-apikey"
+          bind:value={providerForm.apiKey}
+          type="password"
+          placeholder="sk-..."
+        />
       </div>
     </div>
-  {/if}
+
+    <div class="row">
+      <label
+        ><input
+          type="checkbox"
+          bind:checked={providerForm.isDefault}
+          style="width:auto;"
+        /> Default provider</label
+      >
+      <label
+        ><input
+          type="checkbox"
+          bind:checked={providerForm.wolEnabled}
+          style="width:auto;"
+        /> Send Wake-on-LAN before requests</label
+      >
+    </div>
+
+    {#if providerForm.wolEnabled}
+      <div class="row">
+        <div style="flex: 1 1 220px;">
+          <label for="provider-wol-mac">WOL MAC</label>
+          <input
+            id="provider-wol-mac"
+            bind:value={providerForm.wolMac}
+            placeholder="00:11:22:33:44:55"
+          />
+        </div>
+        <div style="flex: 1 1 220px;">
+          <label for="provider-wol-broadcast">WOL Broadcast</label>
+          <input
+            id="provider-wol-broadcast"
+            bind:value={providerForm.wolBroadcast}
+          />
+        </div>
+        <div style="flex: 0 1 120px;">
+          <label for="provider-wol-port">WOL Port</label>
+          <input
+            id="provider-wol-port"
+            bind:value={providerForm.wolPort}
+            type="number"
+          />
+        </div>
+      </div>
+    {/if}
+
+    <div class="row modal-footer">
+      <button class="ghost" on:click={closeCreateModal}>Close</button>
+      <button on:click|preventDefault={addProvider}>Save Provider</button>
+    </div>
+  </dialog>
+
+  <dialog
+    bind:this={editDialog}
+    class={`modal stack ${editModalClosing ? "is-closing" : ""}`}
+    aria-labelledby="edit-provider-title"
+    on:cancel|preventDefault={closeEditModal}
+    on:click={(event) => {
+      if (event.currentTarget === event.target) closeEditModal();
+    }}
+  >
+    <div class="modal-header">
+      <h2 id="edit-provider-title">Edit Provider</h2>
+    </div>
+
+    <div class="row">
+      <div style="flex: 1 1 230px;">
+        <label for="edit-provider-name">Name</label>
+        <input
+          id="edit-provider-name"
+          bind:value={editForm.name}
+          placeholder="Main OpenAI"
+        />
+      </div>
+      <div style="flex: 1 1 200px;">
+        <label for="edit-provider-kind">Kind</label>
+        <select id="edit-provider-kind" bind:value={editForm.kind}>
+          <option value="openai">OpenAI</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="other">Other OpenAI-like</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row">
+      <div style="flex: 1 1 260px;">
+        <label for="edit-provider-endpoint">Endpoint URL</label>
+        <input
+          id="edit-provider-endpoint"
+          bind:value={editForm.endpointUrl}
+          placeholder="https://api.openai.com"
+        />
+      </div>
+      <div style="flex: 1 1 260px;">
+        <label for="edit-provider-apikey">API Key / Token (optional)</label>
+        <input
+          id="edit-provider-apikey"
+          bind:value={editForm.apiKey}
+          type="password"
+          placeholder="Leave blank to keep existing key"
+        />
+      </div>
+    </div>
+
+    <div class="row">
+      <label
+        ><input
+          type="checkbox"
+          bind:checked={editForm.isDefault}
+          style="width:auto;"
+        /> Default provider</label
+      >
+      <label
+        ><input
+          type="checkbox"
+          bind:checked={editForm.wolEnabled}
+          style="width:auto;"
+        /> Send Wake-on-LAN before requests</label
+      >
+    </div>
+
+    {#if editForm.wolEnabled}
+      <div class="row">
+        <div style="flex: 1 1 220px;">
+          <label for="edit-provider-wol-mac">WOL MAC</label>
+          <input
+            id="edit-provider-wol-mac"
+            bind:value={editForm.wolMac}
+            placeholder="00:11:22:33:44:55"
+          />
+        </div>
+        <div style="flex: 1 1 220px;">
+          <label for="edit-provider-wol-broadcast">WOL Broadcast</label>
+          <input
+            id="edit-provider-wol-broadcast"
+            bind:value={editForm.wolBroadcast}
+          />
+        </div>
+        <div style="flex: 0 1 120px;">
+          <label for="edit-provider-wol-port">WOL Port</label>
+          <input
+            id="edit-provider-wol-port"
+            bind:value={editForm.wolPort}
+            type="number"
+          />
+        </div>
+      </div>
+    {/if}
+
+    <div class="row" style="justify-content: flex-end;">
+      <button class="ghost" on:click={closeEditModal}>Close</button>
+      <button on:click|preventDefault={saveProviderEdits}>Save Changes</button>
+    </div>
+  </dialog>
 </main>

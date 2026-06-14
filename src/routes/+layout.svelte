@@ -15,6 +15,7 @@
       <a href="/" class:active={isActive("/")}>Dashboard</a>
       <a href="/docs" class:active={isActive("/docs")}>API Docs</a>
       <a href="/providers" class:active={isActive("/providers")}>Providers</a>
+      <a href="/testing" class:active={isActive("/testing")}>Testing</a>
       <a href="/virtual-keys" class:active={isActive("/virtual-keys")}
         >Virtual Keys</a
       >

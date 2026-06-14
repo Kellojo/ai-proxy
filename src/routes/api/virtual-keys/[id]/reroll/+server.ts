@@ -8,5 +8,5 @@ export const POST: RequestHandler = async ({ params }) => {
     return json({ error: "Virtual key not found" }, { status: 404 });
   }
 
-  return json({ key: result.key });
+  return json({ key: result.key, plaintext: result.plaintext });
 };

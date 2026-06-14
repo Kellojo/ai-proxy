@@ -4,6 +4,10 @@
   let timelineCanvas: HTMLCanvasElement | null = null;
   let timelineChart: any = null;
   let ChartCtor: any = null;
+  let refreshTimer: ReturnType<typeof setInterval> | null = null;
+  let loadingStats = false;
+
+  const LIVE_REFRESH_MS = 3000;
 
   function formatTime(value: string) {
     const date = new Date(value);
@@ -221,16 +225,33 @@
   }
 
   async function loadStats() {
-    const statsRes = await fetch("/api/stats");
-    stats = await statsRes.json();
-    await tick();
-    await renderTimelineChart();
+    if (loadingStats) return;
+    loadingStats = true;
+
+    try {
+      const statsRes = await fetch("/api/stats");
+      if (!statsRes.ok) return;
+
+      stats = await statsRes.json();
+      await tick();
+      await renderTimelineChart();
+    } finally {
+      loadingStats = false;
+    }
   }
 
   onMount(() => {
     void loadStats();
+    refreshTimer = setInterval(() => {
+      void loadStats();
+    }, LIVE_REFRESH_MS);
 
     return () => {
+      if (refreshTimer) {
+        clearInterval(refreshTimer);
+        refreshTimer = null;
+      }
+
       if (timelineChart) {
         timelineChart.destroy();
         timelineChart = null;

@@ -14,7 +14,10 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     const result = createVirtualKey(body.name);
-    return json({ key: result.key }, { status: 201 });
+    return json(
+      { key: result.key, plaintext: result.plaintext },
+      { status: 201 },
+    );
   } catch (error: any) {
     return json({ error: error.message || "Invalid request" }, { status: 400 });
   }

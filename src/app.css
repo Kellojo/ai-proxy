@@ -331,6 +331,18 @@ a:hover {
   border-radius: 8px;
 }
 
+.mini-toast {
+  width: fit-content;
+  padding: 0.35rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 18%, var(--background));
+  color: color-mix(in srgb, var(--accent) 70%, #ffffff 30%);
+  font-size: 0.78rem;
+  line-height: 1.1;
+  animation: toast-pop 160ms ease-out;
+}
+
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -339,30 +351,11 @@ a:hover {
   flex-wrap: wrap;
 }
 
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  background: rgba(1, 4, 9, 0.56);
-  display: grid;
-  place-items: center;
-  padding: 1rem;
-}
-
-.modal-dismiss {
-  position: absolute;
-  inset: 0;
-  border: 0;
-  border-radius: 0;
-  padding: 0;
-  background: transparent;
-  cursor: default;
-}
-
 .modal {
   position: relative;
-  z-index: 1;
+  margin: auto;
   width: min(760px, 100%);
+  max-width: calc(100% - 2rem);
   max-height: 90vh;
   overflow: auto;
   border: 1px solid var(--borderColor);
@@ -377,6 +370,24 @@ a:hover {
   flex-direction: column;
   gap: 0.25rem;
   transition: border-color 0.1s ease-out;
+  animation: dialog-in 140ms ease-out;
+}
+
+.modal:not([open]) {
+  display: none;
+}
+
+.modal::backdrop {
+  background: rgba(1, 4, 9, 0.56);
+  animation: dialog-backdrop-in 140ms ease-out;
+}
+
+.modal.is-closing {
+  animation: dialog-out 140ms ease-in forwards;
+}
+
+.modal.is-closing::backdrop {
+  animation: dialog-backdrop-out 140ms ease-in forwards;
 }
 
 .modal-header {
@@ -384,6 +395,69 @@ a:hover {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 0.75rem;
+}
+
+.modal-footer {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid color-mix(in srgb, var(--line) 58%, var(--glass-border));
+  justify-content: flex-end;
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes dialog-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+}
+
+@keyframes dialog-backdrop-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-backdrop-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes toast-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .stats-strip {
@@ -745,6 +819,36 @@ a:hover {
   display: block;
   width: 100%;
   height: 280px;
+}
+
+.test-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 980px) {
+  .test-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.test-output {
+  min-height: 280px;
+  max-height: 420px;
+  overflow: auto;
+}
+
+.test-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.field-help {
+  margin-top: 0.28rem;
+  font-size: 0.8rem;
+  color: var(--muted);
 }
 
 @media (max-width: 640px) {
