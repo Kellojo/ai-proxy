@@ -20,6 +20,41 @@ npm run dev
 
 Open http://localhost:5173
 
+## Run with published container image
+
+You can run the latest published image directly from GHCR:
+
+```bash
+docker run --rm \
+  -p 3000:3000 \
+  -v $(pwd)/data:/app/data \
+  ghcr.io/kellojo/ai-proxy:latest
+```
+
+Then open http://localhost:3000
+
+On Windows PowerShell, use:
+
+```powershell
+docker run --rm `
+  -p 3000:3000 `
+  -v "${PWD}\data:/app/data" `
+  ghcr.io/kellojo/ai-proxy:latest
+```
+
+Or with Compose:
+
+```yaml
+services:
+  ai-proxy:
+    image: ghcr.io/kellojo/ai-proxy:latest
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+```
+
 ## Proxy usage
 
 Use virtual key in bearer auth:
