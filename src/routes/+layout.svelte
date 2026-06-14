@@ -6,11 +6,17 @@
     if (path === "/") return page.url.pathname === "/";
     return page.url.pathname.startsWith(path);
   }
+
+  // @ts-ignore
+  const version = __VERSION__;
 </script>
 
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="brand" href="/">AI Proxy</a>
+    <div class="brand-row">
+      <a class="brand" href="/">AI Proxy</a>
+      <span class="version">v{version}</span>
+    </div>
     <nav class="nav" aria-label="Primary navigation">
       <a href="/" class:active={isActive("/")}>Dashboard</a>
       <a href="/docs" class:active={isActive("/docs")}>API Docs</a>
