@@ -29,7 +29,7 @@ type ProviderFetchResult = {
   error?: string;
 };
 
-const DEFAULT_MODELS_CACHE_TTL_MS = 5 * 60 * 1000;
+const DEFAULT_MODELS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const parsedCacheTtlMs = Number.parseInt(
   process.env.MODELS_CACHE_TTL_MS || "",
   10,
@@ -40,6 +40,10 @@ const MODELS_CACHE_TTL_MS =
     : DEFAULT_MODELS_CACHE_TTL_MS;
 
 const modelsCache = new Map<string, CachedModelsEntry>();
+
+function isModelsCacheEnabled(provider: Provider): boolean {
+  return provider.wolEnabled;
+}
 
 function providerFingerprint(provider: Provider): string {
   return [
@@ -138,7 +142,9 @@ async function fetchProviderModels(
   virtualKeyId: string,
   options?: { bypassCache?: boolean },
 ): Promise<ProviderFetchResult> {
-  if (!options?.bypassCache) {
+  const cacheEnabled = isModelsCacheEnabled(provider);
+
+  if (cacheEnabled && !options?.bypassCache) {
     const cached = readCachedModels(provider);
     if (cached) {
       logRequest({
@@ -185,6 +191,7 @@ async function fetchProviderModels(
 
       const staleCache = modelsCache.get(provider.id);
       if (
+        cacheEnabled &&
         staleCache &&
         staleCache.providerFingerprint === providerFingerprint(provider)
       ) {
@@ -218,7 +225,9 @@ async function fetchProviderModels(
         ? payload.models
         : [];
 
-    writeCachedModels(provider, models);
+    if (cacheEnabled) {
+      writeCachedModels(provider, models);
+    }
 
     logRequest({
       providerId: provider.id,
@@ -249,6 +258,7 @@ async function fetchProviderModels(
 
     const staleCache = modelsCache.get(provider.id);
     if (
+      cacheEnabled &&
       staleCache &&
       staleCache.providerFingerprint === providerFingerprint(provider)
     ) {
@@ -321,7 +331,7 @@ export const GET: RequestHandler = async ({ request }) => {
       return json({ error: "Provider not found" }, { status: 404 });
     }
 
-    if (bypassCache) {
+    if (bypassCache && isModelsCacheEnabled(provider)) {
       clearModelsCache(provider.id);
     }
 
@@ -346,6 +356,7 @@ export const GET: RequestHandler = async ({ request }) => {
       data: result.models,
       meta: {
         cacheTtlMs: MODELS_CACHE_TTL_MS,
+        cacheEnabled: isModelsCacheEnabled(provider),
         fromCache: result.fromCache,
         stale: result.stale,
         cacheAgeMs: result.cacheAgeMs,
@@ -452,11 +463,15 @@ export const DELETE: RequestHandler = async ({ request }) => {
   }
 
   const providerId = readProviderId(request);
-  if (providerId && !getProvider(providerId)) {
+  const provider = providerId ? getProvider(providerId) : undefined;
+  if (providerId && !provider) {
     return json({ error: "Provider not found" }, { status: 404 });
   }
 
-  const clearedEntries = clearModelsCache(providerId);
+  const clearedEntries =
+    providerId && provider && !isModelsCacheEnabled(provider)
+      ? 0
+      : clearModelsCache(providerId);
 
   logRequest({
     providerId,
