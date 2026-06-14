@@ -10,7 +10,6 @@ import {
 import { extractBearer } from "$lib/server/keys";
 import { forwardModelList } from "$lib/server/proxy";
 import type { Provider } from "$lib/server/types";
-import { executeWithWolStartupGrace } from "$lib/server/wol-startup";
 
 type CachedModelsEntry = {
   providerFingerprint: string;
@@ -168,14 +167,7 @@ async function fetchProviderModels(
   }
 
   try {
-    const upstream = await executeWithWolStartupGrace(
-      provider,
-      "models:list",
-      () => forwardModelList(provider),
-      {
-        shouldRetryResult: (response) => response.status >= 500,
-      },
-    );
+    const upstream = await forwardModelList(provider);
     const statusCode = upstream.status;
     const text = await upstream.text();
 
