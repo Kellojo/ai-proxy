@@ -1,3 +1,7 @@
+<script lang="ts">
+  export let data: { baseUrl: string };
+</script>
+
 <main>
   <div class="stack" style="margin-bottom: 1rem;">
     <h1>API Documentation</h1>
@@ -5,7 +9,7 @@
       How to use the proxy endpoints locally and from client apps.
     </p>
     <div class="notice">
-      Base URL: <code>http://localhost:5173</code> in development.
+      Base URL: <code>{data.baseUrl}</code>
     </div>
   </div>
 
@@ -98,7 +102,7 @@
 
       <h3>Create a Provider</h3>
       <pre><code
-          >curl -X POST http://localhost:5173/api/providers \
+          >curl -X POST {data.baseUrl}/api/providers \
   -H "Content-Type: application/json" \
   -d '&#123;
     "name": "OpenAI",
@@ -112,20 +116,20 @@
 
       <h3>Create a Virtual Key</h3>
       <pre><code
-          >curl -X POST http://localhost:5173/api/virtual-keys \
+          >curl -X POST {data.baseUrl}/api/virtual-keys \
   -H "Content-Type: application/json" \
   -d '&#123;"name":"Local Client"&#125;'</code
         ></pre>
 
       <h3>List Models</h3>
       <pre><code
-          >curl http://localhost:5173/api/proxy/openai/v1/models \
+          >curl {data.baseUrl}/api/proxy/openai/v1/models \
   -H "Authorization: Bearer vk_your_virtual_key"</code
         ></pre>
 
       <h3>Chat Completion</h3>
       <pre><code
-          >curl -X POST http://localhost:5173/api/proxy/openai/v1/chat/completions \
+          >curl -X POST {data.baseUrl}/api/proxy/openai/v1/chat/completions \
   -H "Authorization: Bearer vk_your_virtual_key" \
   -H "Content-Type: application/json" \
   -d '&#123;
@@ -136,7 +140,7 @@
 
       <h3>Streaming Chat Completion</h3>
       <pre><code
-          >curl -N -X POST http://localhost:5173/api/proxy/openai/v1/chat/completions \
+          >curl -N -X POST {data.baseUrl}/api/proxy/openai/v1/chat/completions \
   -H "Authorization: Bearer vk_your_virtual_key" \
   -H "Content-Type: application/json" \
   -d '&#123;
