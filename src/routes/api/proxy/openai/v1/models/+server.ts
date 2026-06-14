@@ -169,10 +169,13 @@ async function fetchProviderModels(
 
   if (provider.wolEnabled) {
     if (!provider.wolMac) {
-      console.warn("[WOL] Skipped wake request: provider has no MAC configured", {
-        providerId: provider.id,
-        providerName: provider.name,
-      });
+      console.warn(
+        "[WOL] Skipped wake request: provider has no MAC configured",
+        {
+          providerId: provider.id,
+          providerName: provider.name,
+        },
+      );
     } else {
       await sendWakeOnLan(
         provider.wolMac,
