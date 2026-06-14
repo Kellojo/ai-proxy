@@ -11,12 +11,14 @@ import { extractBearer } from "$lib/server/keys";
 import { forwardModelList } from "$lib/server/proxy";
 import type { Provider } from "$lib/server/types";
 import { executeWithWolStartupGrace } from "$lib/server/wol-startup";
-
-type CachedModelsEntry = {
-  providerFingerprint: string;
-  cachedAt: number;
-  models: any[];
-};
+import {
+  MODELS_CACHE_TTL_MS,
+  clearModelsCache,
+  isModelsCacheEnabled,
+  readCachedModels,
+  readStaleCachedModels,
+  writeCachedModels,
+} from "$lib/server/models-cache";
 
 type ProviderFetchResult = {
   provider: Provider;
@@ -28,35 +30,6 @@ type ProviderFetchResult = {
   cacheAgeMs?: number;
   error?: string;
 };
-
-const DEFAULT_MODELS_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
-const parsedCacheTtlMs = Number.parseInt(
-  process.env.MODELS_CACHE_TTL_MS || "",
-  10,
-);
-const MODELS_CACHE_TTL_MS =
-  Number.isFinite(parsedCacheTtlMs) && parsedCacheTtlMs > 0
-    ? parsedCacheTtlMs
-    : DEFAULT_MODELS_CACHE_TTL_MS;
-
-const modelsCache = new Map<string, CachedModelsEntry>();
-
-function isModelsCacheEnabled(provider: Provider): boolean {
-  return provider.wolEnabled;
-}
-
-function providerFingerprint(provider: Provider): string {
-  return [
-    provider.id,
-    provider.kind,
-    provider.endpointUrl,
-    provider.apiKey,
-    provider.wolEnabled ? "1" : "0",
-    provider.wolMac || "",
-    provider.wolBroadcast || "",
-    provider.wolPort || "",
-  ].join("|");
-}
 
 function readProviderId(request: Request): string | undefined {
   return (
@@ -93,47 +66,6 @@ function shouldBypassCache(request: Request): boolean {
     bustHeader === "1" ||
     bustHeader === "true"
   );
-}
-
-function clearModelsCache(providerId?: string): number {
-  if (providerId) {
-    return modelsCache.delete(providerId) ? 1 : 0;
-  }
-
-  const removed = modelsCache.size;
-  modelsCache.clear();
-  return removed;
-}
-
-function readCachedModels(provider: Provider): {
-  models: any[];
-  cacheAgeMs: number;
-} | null {
-  const cached = modelsCache.get(provider.id);
-  if (!cached) return null;
-
-  if (cached.providerFingerprint !== providerFingerprint(provider)) {
-    modelsCache.delete(provider.id);
-    return null;
-  }
-
-  const cacheAgeMs = Date.now() - cached.cachedAt;
-  if (cacheAgeMs >= MODELS_CACHE_TTL_MS) {
-    return null;
-  }
-
-  return {
-    models: cached.models,
-    cacheAgeMs,
-  };
-}
-
-function writeCachedModels(provider: Provider, models: any[]): void {
-  modelsCache.set(provider.id, {
-    providerFingerprint: providerFingerprint(provider),
-    cachedAt: Date.now(),
-    models,
-  });
 }
 
 async function fetchProviderModels(
@@ -188,12 +120,8 @@ async function fetchProviderModels(
         virtualKeyId,
       });
 
-      const staleCache = modelsCache.get(provider.id);
-      if (
-        cacheEnabled &&
-        staleCache &&
-        staleCache.providerFingerprint === providerFingerprint(provider)
-      ) {
+      const staleCache = readStaleCachedModels(provider);
+      if (cacheEnabled && staleCache) {
         return {
           provider,
           ok: true,
@@ -201,7 +129,7 @@ async function fetchProviderModels(
           models: staleCache.models,
           fromCache: true,
           stale: true,
-          cacheAgeMs: Date.now() - staleCache.cachedAt,
+          cacheAgeMs: staleCache.cacheAgeMs,
           error: text || "Provider returned an error response",
         };
       }
@@ -255,12 +183,8 @@ async function fetchProviderModels(
       virtualKeyId,
     });
 
-    const staleCache = modelsCache.get(provider.id);
-    if (
-      cacheEnabled &&
-      staleCache &&
-      staleCache.providerFingerprint === providerFingerprint(provider)
-    ) {
+    const staleCache = readStaleCachedModels(provider);
+    if (cacheEnabled && staleCache) {
       return {
         provider,
         ok: true,
@@ -268,7 +192,7 @@ async function fetchProviderModels(
         models: staleCache.models,
         fromCache: true,
         stale: true,
-        cacheAgeMs: Date.now() - staleCache.cachedAt,
+        cacheAgeMs: staleCache.cacheAgeMs,
         error: error?.message || "Unknown proxy error",
       };
     }

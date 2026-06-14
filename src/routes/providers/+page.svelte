@@ -1,5 +1,14 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onDestroy, onMount } from "svelte";
+
+  type ProviderModelCache = {
+    cachedAt: string;
+    cacheAgeMs: number;
+    expiresInMs: number;
+    expired: boolean;
+    modelCount: number;
+    modelIds: string[];
+  };
 
   type Provider = {
     id: string;
@@ -11,11 +20,16 @@
     wolMac?: string;
     wolBroadcast?: string;
     wolPort?: number;
+    cacheEnabled: boolean;
+    modelCache: ProviderModelCache | null;
   };
 
   let providers: Provider[] = [];
+  let cacheTtlMs = 0;
   let message = "";
   let error = "";
+  let loadingProviders = false;
+  const MODEL_PREVIEW_MAX_CHARS = 15;
   const DIALOG_ANIMATION_MS = 140;
 
   let showCreateModal = false;
@@ -26,6 +40,7 @@
 
   let createDialog: HTMLDialogElement | null = null;
   let editDialog: HTMLDialogElement | null = null;
+  let cacheRefreshInterval: ReturnType<typeof setInterval> | null = null;
 
   let providerForm = {
     name: "",
@@ -52,8 +67,70 @@
   };
 
   async function loadProviders() {
-    const response = await fetch("/api/providers");
-    providers = (await response.json()).providers || [];
+    loadingProviders = true;
+
+    try {
+      const response = await fetch("/api/providers");
+      const payload = await response.json();
+
+      if (!response.ok) {
+        error = payload?.error || "Failed to load providers";
+        return;
+      }
+
+      providers = payload?.providers || [];
+      cacheTtlMs = payload?.cacheTtlMs || 0;
+    } catch {
+      error = "Failed to load providers";
+    } finally {
+      loadingProviders = false;
+    }
+  }
+
+  async function refreshProviderData() {
+    await loadProviders();
+  }
+
+  async function refreshProvidersIfVisible() {
+    if (
+      typeof document !== "undefined" &&
+      document.visibilityState !== "visible"
+    ) {
+      return;
+    }
+
+    await loadProviders();
+  }
+
+  function formatDuration(ms?: number) {
+    if (!ms || ms <= 0) return "0s";
+
+    const seconds = Math.floor(ms / 1000);
+    if (seconds < 60) return `${seconds}s`;
+
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ${seconds % 60}s`;
+
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ${minutes % 60}m`;
+
+    const days = Math.floor(hours / 24);
+    return `${days}d ${hours % 24}h`;
+  }
+
+  function modelPreview(modelIds: string[]): string {
+    const full = modelIds.join(", ");
+    if (!full) return "-";
+    if (full.length <= MODEL_PREVIEW_MAX_CHARS) return full;
+    return `${full.slice(0, MODEL_PREVIEW_MAX_CHARS)}...`;
+  }
+
+  function cacheTooltip(provider: Provider): string {
+    if (!provider.modelCache) return "No cached models";
+
+    const status = provider.modelCache.expired ? "Expired" : "Fresh";
+    const ids = provider.modelCache.modelIds.join(", ") || "-";
+    return `${status} | ${provider.modelCache.modelCount} model(s) | ${formatDuration(provider.modelCache.cacheAgeMs)} old\n${ids}`;
   }
 
   async function addProvider() {
@@ -80,7 +157,7 @@
     };
     closeCreateModal();
 
-    await loadProviders();
+    await refreshProviderData();
   }
 
   function openCreateModal() {
@@ -105,7 +182,7 @@
     if (!confirmed) return;
 
     await fetch(`/api/providers/${id}`, { method: "DELETE" });
-    await loadProviders();
+    await refreshProviderData();
   }
 
   function openEditProvider(provider: Provider) {
@@ -157,7 +234,7 @@
 
     message = `Provider ${payload.provider.name} updated`;
     closeEditModal();
-    await loadProviders();
+    await refreshProviderData();
   }
 
   $: {
@@ -180,7 +257,42 @@
     }
   }
 
-  onMount(loadProviders);
+  onMount(() => {
+    refreshProviderData();
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        loadProviders();
+      }
+    };
+
+    const onWindowFocus = () => {
+      loadProviders();
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    window.addEventListener("focus", onWindowFocus);
+
+    cacheRefreshInterval = setInterval(() => {
+      refreshProvidersIfVisible();
+    }, 5000);
+
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      window.removeEventListener("focus", onWindowFocus);
+      if (cacheRefreshInterval) {
+        clearInterval(cacheRefreshInterval);
+        cacheRefreshInterval = null;
+      }
+    };
+  });
+
+  onDestroy(() => {
+    if (cacheRefreshInterval) {
+      clearInterval(cacheRefreshInterval);
+      cacheRefreshInterval = null;
+    }
+  });
 </script>
 
 <main>
@@ -198,75 +310,89 @@
     {#if error}<div class="error">{error}</div>{/if}
   </div>
 
-  <div class="grid">
-    <section class="card span-12 stack">
-      <h2>Configured Providers</h2>
-      {#if providers.length === 0}
-        <p class="muted">No providers yet.</p>
-      {:else}
-        <div class="table-wrap">
-          <table class="logs-table entity-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Kind</th>
-                <th>Endpoint</th>
-                <th>Default</th>
-                <th>Wake-on-LAN</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each providers as provider}
-                <tr>
-                  <td><strong>{provider.name}</strong></td>
-                  <td>
-                    <span class="kind-chip">{provider.kind}</span>
-                  </td>
-                  <td>
-                    <span class="provider-endpoint" title={provider.endpointUrl}
-                      >{provider.endpointUrl}</span
-                    >
-                  </td>
-                  <td>
-                    {#if provider.isDefault}
-                      <span class="status-pill ok">Default</span>
-                    {:else}
-                      <span class="muted">No</span>
-                    {/if}
-                  </td>
-                  <td>
-                    {#if provider.wolEnabled}
-                      <span
-                        class="wol-detail"
-                        title={`${provider.wolMac || ""} via ${provider.wolBroadcast || ""}:${provider.wolPort || ""}`}
-                        >{provider.wolMac} via {provider.wolBroadcast}:{provider.wolPort}</span
-                      >
-                    {:else}
-                      <span class="muted">Disabled</span>
-                    {/if}
-                  </td>
-                  <td>
-                    <div class="table-actions">
-                      <button
-                        class="ghost"
-                        on:click={() => openEditProvider(provider)}>Edit</button
-                      >
-                      <button
-                        class="danger"
-                        on:click={() => removeProvider(provider.id)}
-                        >Delete</button
-                      >
-                    </div>
-                  </td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-      {/if}
-    </section>
-  </div>
+  {#if providers.length === 0}
+    <p class="muted">No providers yet.</p>
+  {:else}
+    <div class="table-wrap card">
+      <table class="logs-table entity-table providers-table">
+        <thead>
+          <tr>
+            <th>Name / Endpoint</th>
+            <th>Kind / Default</th>
+            <th>Wake-on-LAN</th>
+            <th>Model Cache / Models</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each providers as provider}
+            <tr>
+              <td>
+                <strong>{provider.name}</strong>
+                <div class="provider-endpoint" title={provider.endpointUrl}>
+                  {provider.endpointUrl}
+                </div>
+              </td>
+              <td>
+                <span class="kind-chip">{provider.kind}</span>
+                {#if provider.isDefault}
+                  <div style="margin-top: 0.35rem;">
+                    <span class="status-pill ok">Default</span>
+                  </div>
+                {:else}
+                  <div class="muted" style="margin-top: 0.35rem;">
+                    Not default
+                  </div>
+                {/if}
+              </td>
+              <td>
+                {#if provider.wolEnabled}
+                  <span
+                    class="wol-detail"
+                    title={`${provider.wolMac || ""} via ${provider.wolBroadcast || ""}:${provider.wolPort || ""}`}
+                    >{provider.wolMac} via {provider.wolBroadcast}:{provider.wolPort}</span
+                  >
+                {:else}
+                  <span class="muted">Disabled</span>
+                {/if}
+              </td>
+              <td>
+                {#if loadingProviders}
+                  <span class="muted">Loading...</span>
+                {:else if provider.modelCache}
+                  <div class="muted">
+                    {provider.modelCache.modelCount} model(s), {formatDuration(
+                      provider.modelCache.cacheAgeMs,
+                    )} old
+                  </div>
+                  <div
+                    class="provider-endpoint cached-model-list"
+                    title={cacheTooltip(provider)}
+                  >
+                    {modelPreview(provider.modelCache.modelIds)}
+                  </div>
+                {:else}
+                  <span class="muted">Empty</span>
+                {/if}
+              </td>
+              <td>
+                <div class="table-actions">
+                  <button
+                    class="ghost"
+                    on:click={() => openEditProvider(provider)}>Edit</button
+                  >
+                  <button
+                    class="danger"
+                    on:click={() => removeProvider(provider.id)}>Delete</button
+                  >
+                </div>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {/if}
 
   <dialog
     bind:this={createDialog}

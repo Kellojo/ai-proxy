@@ -573,6 +573,25 @@ a:hover {
   min-width: 840px;
 }
 
+.providers-table {
+  table-layout: fixed;
+  min-width: 760px;
+}
+
+.providers-table th,
+.providers-table td {
+  overflow-wrap: anywhere;
+}
+
+.cached-model-list {
+  display: block;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-overflow: clip;
+}
+
 .entity-table th {
   font-size: 0.8rem;
   text-transform: uppercase;
