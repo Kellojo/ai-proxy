@@ -24,6 +24,7 @@
   let prompt = "Say hello in one short sentence.";
 
   let busyModels = false;
+  let busyCacheRefresh = false;
   let busyChat = false;
 
   let infoMessage = "";
@@ -53,7 +54,7 @@
     selectedProviderId = defaultProvider?.id || providers[0]?.id || "";
   }
 
-  async function fetchModels() {
+  async function fetchModels(options?: { bypassCache?: boolean }) {
     resetMessages();
     responseText = "";
     rawResponse = "";
@@ -74,6 +75,11 @@
         headers["x-provider-id"] = selectedProviderId;
       }
 
+      if (options?.bypassCache) {
+        headers["cache-control"] = "no-cache";
+        headers["x-refresh-cache"] = "1";
+      }
+
       const res = await fetch("/api/proxy/openai/v1/models", {
         method: "GET",
         headers,
@@ -90,9 +96,57 @@
 
       models = Array.isArray(payload?.data) ? payload.data : [];
       selectedModel = models[0]?.id || "";
-      infoMessage = `Loaded ${models.length} model(s).`;
+      const fromCache = payload?.meta?.providersFromCache;
+      infoMessage =
+        typeof fromCache === "number"
+          ? `Loaded ${models.length} model(s) (${fromCache} provider cache hit(s)).`
+          : `Loaded ${models.length} model(s).`;
     } finally {
       busyModels = false;
+    }
+  }
+
+  async function clearCacheAndRefreshModels() {
+    resetMessages();
+    responseText = "";
+    rawResponse = "";
+
+    if (!virtualKey.trim()) {
+      errorMessage = "Virtual key is required to clear model cache.";
+      return;
+    }
+
+    busyCacheRefresh = true;
+
+    try {
+      const headers: Record<string, string> = {
+        Authorization: `Bearer ${virtualKey.trim()}`,
+      };
+
+      if (selectedProviderId) {
+        headers["x-provider-id"] = selectedProviderId;
+      }
+
+      const clearRes = await fetch("/api/proxy/openai/v1/models", {
+        method: "DELETE",
+        headers,
+      });
+
+      const clearPayload = await clearRes.json().catch(() => ({}));
+      lastStatus = String(clearRes.status);
+
+      if (!clearRes.ok) {
+        errorMessage = clearPayload?.error || "Failed to clear model cache";
+        rawResponse = JSON.stringify(clearPayload, null, 2);
+        return;
+      }
+
+      await fetchModels({ bypassCache: true });
+      infoMessage = selectedProviderId
+        ? "Cleared provider model cache and reloaded models."
+        : "Cleared model cache and reloaded models.";
+    } finally {
+      busyCacheRefresh = false;
     }
   }
 
@@ -202,9 +256,18 @@
         <button
           class="alt"
           on:click|preventDefault={fetchModels}
-          disabled={busyModels || providers.length === 0}
+          disabled={busyModels || busyCacheRefresh || providers.length === 0}
         >
           {busyModels ? "Loading models..." : "Load Models"}
+        </button>
+        <button
+          class="alt"
+          on:click|preventDefault={clearCacheAndRefreshModels}
+          disabled={busyModels || busyCacheRefresh || providers.length === 0}
+        >
+          {busyCacheRefresh
+            ? "Refreshing models..."
+            : "Refresh Models (Clear Cache)"}
         </button>
       </div>
 
