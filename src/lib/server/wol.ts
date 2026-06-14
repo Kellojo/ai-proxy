@@ -1,4 +1,25 @@
-import dgram from "node:dgram";
+import wakeOnLan from "wake_on_lan";
+
+const DEFAULT_WOL_PACKET_BURST = 3;
+const DEFAULT_WOL_BURST_INTERVAL_MS = 120;
+
+function readPositiveIntEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return parsed;
+}
+
+const WOL_PACKET_BURST = readPositiveIntEnv(
+  "WOL_PACKET_BURST",
+  DEFAULT_WOL_PACKET_BURST,
+);
+const WOL_BURST_INTERVAL_MS = readPositiveIntEnv(
+  "WOL_BURST_INTERVAL_MS",
+  DEFAULT_WOL_BURST_INTERVAL_MS,
+);
 
 function normalizeMac(mac: string): string {
   return mac.replace(/[^a-fA-F0-9]/g, "").toLowerCase();
@@ -10,15 +31,7 @@ export function createMagicPacket(macAddress: string): Buffer {
     throw new Error("Invalid MAC address format for Wake-on-LAN");
   }
 
-  const macBytes = Buffer.from(normalized, "hex");
-  const header = Buffer.alloc(6, 0xff);
-  const body = Buffer.alloc(16 * 6);
-
-  for (let i = 0; i < 16; i += 1) {
-    macBytes.copy(body, i * 6);
-  }
-
-  return Buffer.concat([header, body]);
+  return wakeOnLan.createMagicPacket(normalized);
 }
 
 export async function sendWakeOnLan(
@@ -26,23 +39,24 @@ export async function sendWakeOnLan(
   broadcastAddress = "255.255.255.255",
   port = 9,
 ): Promise<void> {
-  const packet = createMagicPacket(macAddress);
+  const normalized = normalizeMac(macAddress);
+  if (normalized.length !== 12) {
+    throw new Error("Invalid MAC address format for Wake-on-LAN");
+  }
 
   await new Promise<void>((resolve, reject) => {
-    const socket = dgram.createSocket("udp4");
-
-    socket.once("error", (error) => {
-      socket.close();
-      reject(error);
-    });
-
-    socket.bind(() => {
-      socket.setBroadcast(true);
-      socket.send(packet, port, broadcastAddress, (error) => {
-        socket.close();
+    wakeOnLan.wake(
+      normalized,
+      {
+        address: broadcastAddress,
+        port,
+        num_packets: WOL_PACKET_BURST,
+        interval: WOL_BURST_INTERVAL_MS,
+      },
+      (error?: unknown) => {
         if (error) reject(error);
         else resolve();
-      });
-    });
+      },
+    );
   });
 }

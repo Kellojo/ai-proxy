@@ -85,3 +85,8 @@ Then open http://localhost:3000
 
 - `DATABASE_PATH` (optional): custom path for SQLite DB file
 - `PORT` (optional): listen port in container/runtime
+- `WOL_BOOT_WAIT_MS` (optional, default `20000`): wait time after sending WOL before first upstream attempt
+- `WOL_RETRY_ATTEMPTS` (optional, default `8`): retry count while provider is still booting/unreachable
+- `WOL_RETRY_INTERVAL_MS` (optional, default `3000`): delay between startup retries
+- `WOL_PACKET_BURST` (optional, default `3`): number of WOL magic packets sent per wake request
+- `WOL_BURST_INTERVAL_MS` (optional, default `120`): delay between burst packets

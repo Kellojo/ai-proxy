@@ -10,7 +10,7 @@ import {
 import { extractBearer } from "$lib/server/keys";
 import { forwardModelList } from "$lib/server/proxy";
 import type { Provider } from "$lib/server/types";
-import { sendWakeOnLan } from "$lib/server/wol";
+import { executeWithWolStartupGrace } from "$lib/server/wol-startup";
 
 type CachedModelsEntry = {
   providerFingerprint: string;
@@ -167,38 +167,15 @@ async function fetchProviderModels(
     }
   }
 
-  if (provider.wolEnabled) {
-    if (!provider.wolMac) {
-      console.warn(
-        "[WOL] Skipped wake request: provider has no MAC configured",
-        {
-          providerId: provider.id,
-          providerName: provider.name,
-        },
-      );
-    } else {
-      await sendWakeOnLan(
-        provider.wolMac,
-        provider.wolBroadcast,
-        provider.wolPort,
-      ).catch((error: unknown) => {
-        const message =
-          error instanceof Error ? error.message : "Unknown WOL error";
-
-        console.error("[WOL] Failed to send wake packet", {
-          providerId: provider.id,
-          providerName: provider.name,
-          mac: provider.wolMac,
-          broadcast: provider.wolBroadcast || "255.255.255.255",
-          port: provider.wolPort || 9,
-          error: message,
-        });
-      });
-    }
-  }
-
   try {
-    const upstream = await forwardModelList(provider);
+    const upstream = await executeWithWolStartupGrace(
+      provider,
+      "models:list",
+      () => forwardModelList(provider),
+      {
+        shouldRetryResult: (response) => response.status >= 500,
+      },
+    );
     const statusCode = upstream.status;
     const text = await upstream.text();
 

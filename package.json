@@ -22,7 +22,8 @@
     "@sveltejs/kit": "^2.65.0",
     "better-sqlite3": "^12.10.1",
     "chart.js": "^4.5.1",
-    "svelte": "^5.56.0"
+    "svelte": "^5.56.0",
+    "wake_on_lan": "^1.0.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

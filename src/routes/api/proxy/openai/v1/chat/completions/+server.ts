@@ -9,7 +9,7 @@ import {
 } from "$lib/server/db";
 import { extractBearer } from "$lib/server/keys";
 import { forwardChatCompletion } from "$lib/server/proxy";
-import { sendWakeOnLan } from "$lib/server/wol";
+import { executeWithWolStartupGrace } from "$lib/server/wol-startup";
 
 function readNumericValue(value: unknown): number | undefined {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -119,41 +119,18 @@ export const POST: RequestHandler = async ({ request }) => {
     );
   }
 
-  if (provider.wolEnabled) {
-    if (!provider.wolMac) {
-      console.warn(
-        "[WOL] Skipped wake request: provider has no MAC configured",
-        {
-          providerId: provider.id,
-          providerName: provider.name,
-        },
-      );
-    } else {
-      await sendWakeOnLan(
-        provider.wolMac,
-        provider.wolBroadcast,
-        provider.wolPort,
-      ).catch((error: unknown) => {
-        const message =
-          error instanceof Error ? error.message : "Unknown WOL error";
-
-        console.error("[WOL] Failed to send wake packet", {
-          providerId: provider.id,
-          providerName: provider.name,
-          mac: provider.wolMac,
-          broadcast: provider.wolBroadcast || "255.255.255.255",
-          port: provider.wolPort || 9,
-          error: message,
-        });
-      });
-    }
-  }
-
   const model = body?.model || "unknown-model";
 
   let upstream: Response;
   try {
-    upstream = await forwardChatCompletion(provider, body);
+    upstream = await executeWithWolStartupGrace(
+      provider,
+      "chat:completion",
+      () => forwardChatCompletion(provider, body),
+      {
+        shouldRetryResult: (response) => response.status >= 500,
+      },
+    );
   } catch (error: any) {
     const statusCode = 502;
     logRequest({
