@@ -31,8 +31,9 @@
   }
 
   function formatCost(value: unknown) {
+    if (value == null) return "n/a";
     const amount = Number(value);
-    return Number.isFinite(amount) ? `$${amount.toFixed(6)}` : "-";
+    return Number.isFinite(amount) ? `$${amount.toFixed(6)}` : "n/a";
   }
 
   function totalRequests() {
@@ -53,7 +54,7 @@
   }
 
   function totalCost() {
-    return Number(stats?.summary?.total_cost || 0);
+    return stats?.summary?.total_cost;
   }
 
   function activeProviders() {

@@ -410,7 +410,7 @@ export function getStats() {
       `SELECT
             COUNT(*) AS request_count,
             COALESCE(SUM(total_tokens), 0) AS total_tokens,
-            COALESCE(SUM(cost), 0) AS total_cost
+            SUM(cost) AS total_cost
        FROM request_logs`,
     )
     .get();
