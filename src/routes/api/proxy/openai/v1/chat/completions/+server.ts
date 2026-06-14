@@ -119,12 +119,31 @@ export const POST: RequestHandler = async ({ request }) => {
     );
   }
 
-  if (provider.wolEnabled && provider.wolMac) {
-    await sendWakeOnLan(
-      provider.wolMac,
-      provider.wolBroadcast,
-      provider.wolPort,
-    ).catch(() => undefined);
+  if (provider.wolEnabled) {
+    if (!provider.wolMac) {
+      console.warn("[WOL] Skipped wake request: provider has no MAC configured", {
+        providerId: provider.id,
+        providerName: provider.name,
+      });
+    } else {
+      await sendWakeOnLan(
+        provider.wolMac,
+        provider.wolBroadcast,
+        provider.wolPort,
+      ).catch((error: unknown) => {
+        const message =
+          error instanceof Error ? error.message : "Unknown WOL error";
+
+        console.error("[WOL] Failed to send wake packet", {
+          providerId: provider.id,
+          providerName: provider.name,
+          mac: provider.wolMac,
+          broadcast: provider.wolBroadcast || "255.255.255.255",
+          port: provider.wolPort || 9,
+          error: message,
+        });
+      });
+    }
   }
 
   const model = body?.model || "unknown-model";
