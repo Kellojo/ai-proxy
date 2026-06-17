@@ -20,6 +20,12 @@ import {
   writeCachedModels,
 } from "$lib/server/models-cache";
 
+type CachedModelsEntry = {
+  providerFingerprint: string;
+  cachedAt: number;
+  models: any[];
+};
+
 type ProviderFetchResult = {
   provider: Provider;
   ok: boolean;
@@ -100,14 +106,7 @@ async function fetchProviderModels(
   }
 
   try {
-    const upstream = await executeWithWolStartupGrace(
-      provider,
-      "models:list",
-      () => forwardModelList(provider),
-      {
-        shouldRetryResult: (response) => response.status >= 500,
-      },
-    );
+    const upstream = await forwardModelList(provider);
     const statusCode = upstream.status;
     const text = await upstream.text();
 

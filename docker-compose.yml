@@ -6,6 +6,7 @@ services:
     container_name: ai-proxy
     ports:
       - "3000:3000"
+    network_mode: host
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
