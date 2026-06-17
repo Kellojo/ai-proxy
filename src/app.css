@@ -413,6 +413,11 @@ a:hover {
   margin-bottom: 0.75rem;
 }
 
+/* Ensure dialog titles are highly readable */
+.modal-header h2, .modal-header h3 {
+    color: var(--ink);
+}
+
 .modal-footer {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
