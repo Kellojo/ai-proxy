@@ -2,7 +2,6 @@ import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import {
   authenticateVirtualKey,
-  getDefaultProvider,
   getProvider,
   listProviders,
   logRequest,
@@ -10,7 +9,6 @@ import {
 import { extractBearer } from "$lib/server/keys";
 import { forwardModelList } from "$lib/server/proxy";
 import type { Provider } from "$lib/server/types";
-import { executeWithWolStartupGrace } from "$lib/server/wol-startup";
 import {
   MODELS_CACHE_TTL_MS,
   clearModelsCache,
@@ -19,12 +17,14 @@ import {
   readStaleCachedModels,
   writeCachedModels,
 } from "$lib/server/models-cache";
+import {
+  readProviderId,
+  authErrorResponse,
+  noProviderResponse,
+  providerNotFoundResponse,
+} from "$lib/server/common-server";
 
-type CachedModelsEntry = {
-  providerFingerprint: string;
-  cachedAt: number;
-  models: any[];
-};
+const LogPrefix = "models";
 
 type ProviderFetchResult = {
   provider: Provider;
@@ -36,15 +36,6 @@ type ProviderFetchResult = {
   cacheAgeMs?: number;
   error?: string;
 };
-
-function readProviderId(request: Request): string | undefined {
-  return (
-    request.headers.get("x-provider-id") ||
-    request.headers.get("x-ai-provider-id") ||
-    new URL(request.url).searchParams.get("providerId") ||
-    undefined
-  );
-}
 
 function shouldBypassCache(request: Request): boolean {
   const cacheControl = (
@@ -87,7 +78,7 @@ async function fetchProviderModels(
     if (cached) {
       logRequest({
         providerId: provider.id,
-        model: "models:list",
+        model: `${LogPrefix}:list`,
         statusCode: 200,
         durationMs: Date.now() - startedAt,
         virtualKeyId,
@@ -113,7 +104,7 @@ async function fetchProviderModels(
     if (!upstream.ok) {
       logRequest({
         providerId: provider.id,
-        model: "models:list",
+        model: `${LogPrefix}:list`,
         statusCode,
         durationMs: Date.now() - startedAt,
         virtualKeyId,
@@ -157,7 +148,7 @@ async function fetchProviderModels(
 
     logRequest({
       providerId: provider.id,
-      model: "models:list",
+      model: `${LogPrefix}:list`,
       statusCode,
       durationMs: Date.now() - startedAt,
       virtualKeyId,
@@ -176,7 +167,7 @@ async function fetchProviderModels(
 
     logRequest({
       providerId: provider.id,
-      model: "models:list",
+      model: `${LogPrefix}:list`,
       statusCode,
       durationMs: Date.now() - startedAt,
       virtualKeyId,
@@ -214,43 +205,34 @@ export const GET: RequestHandler = async ({ request }) => {
   const bearer = extractBearer(request.headers.get("authorization"));
   if (!bearer) {
     logRequest({
-      model: "models:list:unauthenticated",
+      model: `${LogPrefix}:list:unauthenticated`,
       statusCode: 401,
       durationMs: Date.now() - startedAt,
     });
-
-    return json(
-      { error: "Missing virtual key in Authorization header" },
-      { status: 401 },
-    );
+    return authErrorResponse("missing");
   }
 
   const virtualKey = authenticateVirtualKey(bearer);
   if (!virtualKey) {
     logRequest({
-      model: "models:list:unauthenticated",
+      model: `${LogPrefix}:list:unauthenticated`,
       statusCode: 401,
       durationMs: Date.now() - startedAt,
     });
-
-    return json({ error: "Invalid virtual key" }, { status: 401 });
+    return authErrorResponse("invalid");
   }
 
   const providerId = readProviderId(request);
   const bypassCache = shouldBypassCache(request);
   const providers = listProviders();
   if (providers.length === 0) {
-    return json(
-      { error: "No provider configured. Add a provider in the UI first." },
-      { status: 400 },
-    );
+    return noProviderResponse();
   }
 
-  // If a provider was explicitly requested, keep single-provider behavior.
   if (providerId) {
     const provider = getProvider(providerId);
     if (!provider) {
-      return json({ error: "Provider not found" }, { status: 404 });
+      return providerNotFoundResponse();
     }
 
     if (bypassCache && isModelsCacheEnabled(provider)) {
@@ -286,13 +268,7 @@ export const GET: RequestHandler = async ({ request }) => {
     });
   }
 
-  const defaultProvider = getDefaultProvider();
-  const sortedProviders = defaultProvider
-    ? [
-        defaultProvider,
-        ...providers.filter((provider) => provider.id !== defaultProvider.id),
-      ]
-    : providers;
+  const sortedProviders = providers;
 
   if (bypassCache) {
     clearModelsCache();
@@ -362,32 +338,27 @@ export const DELETE: RequestHandler = async ({ request }) => {
   const bearer = extractBearer(request.headers.get("authorization"));
   if (!bearer) {
     logRequest({
-      model: "models:cache:clear:unauthenticated",
+      model: `${LogPrefix}:cache:clear:unauthenticated`,
       statusCode: 401,
       durationMs: Date.now() - startedAt,
     });
-
-    return json(
-      { error: "Missing virtual key in Authorization header" },
-      { status: 401 },
-    );
+    return authErrorResponse("missing");
   }
 
   const virtualKey = authenticateVirtualKey(bearer);
   if (!virtualKey) {
     logRequest({
-      model: "models:cache:clear:unauthenticated",
+      model: `${LogPrefix}:cache:clear:unauthenticated`,
       statusCode: 401,
       durationMs: Date.now() - startedAt,
     });
-
-    return json({ error: "Invalid virtual key" }, { status: 401 });
+    return authErrorResponse("invalid");
   }
 
   const providerId = readProviderId(request);
   const provider = providerId ? getProvider(providerId) : undefined;
   if (providerId && !provider) {
-    return json({ error: "Provider not found" }, { status: 404 });
+    return providerNotFoundResponse();
   }
 
   const clearedEntries =
@@ -397,7 +368,9 @@ export const DELETE: RequestHandler = async ({ request }) => {
 
   logRequest({
     providerId,
-    model: providerId ? "models:cache:clear:provider" : "models:cache:clear",
+    model: providerId
+      ? `${LogPrefix}:cache:clear:provider`
+      : `${LogPrefix}:cache:clear`,
     statusCode: 200,
     durationMs: Date.now() - startedAt,
     virtualKeyId: virtualKey.id,
