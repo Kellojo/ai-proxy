@@ -125,6 +125,100 @@ export async function forwardChatCompletion(
   });
 }
 
+function anthropicBodyToOpenAI(body: any): any {
+  const messages = Array.isArray(body?.messages) ? body.messages : [];
+  const system = body?.system;
+  const openaiMessages = [];
+
+  if (system) {
+    openaiMessages.push({ role: "system", content: system });
+  }
+
+  for (const msg of messages) {
+    if (msg?.role === "user") {
+      openaiMessages.push({ role: "user", content: msg.content });
+    } else if (msg?.role === "assistant") {
+      openaiMessages.push({ role: "assistant", content: msg.content });
+    }
+  }
+
+  return {
+    model: body?.model,
+    messages: openaiMessages,
+    max_tokens: body?.max_tokens,
+    temperature: body?.temperature,
+    top_p: body?.top_p,
+    stream: body?.stream,
+  };
+}
+
+function openAIToAnthropicResponse(payload: any, model: string) {
+  const content = payload?.choices?.[0]?.message?.content || "";
+  return {
+    id: payload?.id || `msg_${crypto.randomUUID()}`,
+    type: "message",
+    role: "assistant",
+    model,
+    content: [
+      {
+        type: "text",
+        text: content,
+      },
+    ],
+    stop_reason: payload?.choices?.[0]?.finish_reason || "stop",
+    usage: {
+      input_tokens: payload?.usage?.prompt_tokens || 0,
+      output_tokens: payload?.usage?.completion_tokens || 0,
+    },
+  };
+}
+
+export async function forwardAnthropicMessages(
+  provider: Provider,
+  body: any,
+): Promise<Response> {
+  if (provider.kind === "anthropic") {
+    const targetUrl = buildUrl(provider.endpointUrl, "/v1/messages");
+    return fetch(targetUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-api-key": provider.apiKey,
+        "anthropic-version": body?.anthropic_version || "2023-06-01",
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  // For non-Anthropic providers, convert Anthropic format to OpenAI format
+  const targetUrl = buildUrl(provider.endpointUrl, "/v1/chat/completions");
+  const openAIBody = anthropicBodyToOpenAI(body);
+
+  const response = await fetch(targetUrl, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${provider.apiKey}`,
+    },
+    body: JSON.stringify(openAIBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    return new Response(errorText, {
+      status: response.status,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  const mapped = openAIToAnthropicResponse(payload, body?.model || "unknown-model");
+  return new Response(JSON.stringify(mapped), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
+}
+
 export async function forwardModelList(provider: Provider): Promise<Response> {
   const path = provider.kind === "anthropic" ? "/v1/models" : "/v1/models";
   const targetUrl = buildUrl(provider.endpointUrl, path);
