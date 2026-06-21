@@ -48,18 +48,60 @@ function messageContentToString(content: unknown): string {
 
 // ── OpenAI <-> Anthropic request conversion ──────────────────────────────
 
+function openAIToolToAnthropic(tool: any): any {
+  const fn = tool?.function || tool;
+  return {
+    name: fn?.name,
+    description: fn?.description,
+    input_schema: fn?.parameters || {},
+  };
+}
+
+function openaiMessageToAnthropic(msg: any): any {
+  const role = msg?.role;
+  const content = msg?.content;
+  const toolCalls = Array.isArray(msg?.tool_calls) ? msg.tool_calls : [];
+  const toolCallId = msg?.tool_call_id;
+
+  if (toolCallId) {
+    return {
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: toolCallId, content: content ?? "" }],
+    };
+  }
+
+  if (role === "assistant" && toolCalls.length > 0) {
+    const textParts = typeof content === "string" && content ? [{ type: "text", text: content }] : [];
+    const useParts = toolCalls.map((tc: any) => {
+      let args = tc?.function?.arguments;
+      if (typeof args === "string") {
+        try { args = JSON.parse(args); } catch { /* leave as string */ }
+      }
+      return {
+        type: "tool_use",
+        id: tc?.id || `tooluse_${crypto.randomUUID()}`,
+        name: tc?.function?.name,
+        input: args || {},
+      };
+    });
+    return { role: "assistant", content: [...textParts, ...useParts] };
+  }
+
+  return {
+    role: role === "assistant" ? "assistant" : "user",
+    content: messageContentToString(content),
+  };
+}
+
 function openaiRequestToAnthropic(body: any): any {
   const messages = Array.isArray(body?.messages) ? body.messages : [];
 
   const systemMessage = messages.find((m: any) => m?.role === "system");
   const conversationMessages = messages
     .filter((m: any) => m?.role !== "system")
-    .map((m: any) => ({
-      role: m.role === "assistant" ? "assistant" : "user",
-      content: messageContentToString(m.content),
-    }));
+    .map(openaiMessageToAnthropic);
 
-  return {
+  const converted: any = {
     model: body.model,
     max_tokens: body.max_tokens,
     temperature: body.temperature,
@@ -68,6 +110,84 @@ function openaiRequestToAnthropic(body: any): any {
     system: systemMessage?.content,
     messages: conversationMessages,
   };
+
+  if (Array.isArray(body?.tools) && body.tools.length > 0) {
+    converted.tools = body.tools.map(openAIToolToAnthropic);
+  }
+
+  return converted;
+}
+
+function anthropicToolToOpenAI(tool: any): any {
+  return {
+    type: "function",
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.input_schema,
+    },
+  };
+}
+
+function anthropicContentToOpenAI(content: unknown): { contentStr: string | null; toolCalls: any[] } {
+  if (typeof content === "string") return { contentStr: content, toolCalls: [] };
+  if (!Array.isArray(content)) return { contentStr: null, toolCalls: [] };
+
+  const textParts = content.filter((c: any) => c?.type === "text" && typeof c?.text === "string");
+  const toolUseParts = content.filter((c: any) => c?.type === "tool_use");
+  const toolCalls = toolUseParts.map((t: any) => ({
+    id: t.id,
+    type: "function",
+    function: {
+      name: t.name,
+      arguments: typeof t.input === "string" ? t.input : JSON.stringify(t.input || {}),
+    },
+  }));
+
+  return {
+    contentStr: textParts.length ? textParts.map((t: any) => t.text).join(" ") : null,
+    toolCalls,
+  };
+}
+
+function anthropicMessageToOpenAI(msg: any): any[] {
+  const results: any[] = [];
+
+  if (msg?.role === "user") {
+    const content = msg.content;
+    if (Array.isArray(content)) {
+      const toolResults = content.filter((c: any) => c?.type === "tool_result");
+      const nonTool = content.filter((c: any) => c?.type !== "tool_result");
+
+      if (nonTool.length > 0) {
+        const text = nonTool
+          .filter((c: any) => c?.type === "text")
+          .map((c: any) => c?.text || "")
+          .join(" ");
+        if (text) results.push({ role: "user", content: text });
+      }
+
+      for (const tr of toolResults) {
+        results.push({
+          role: "user",
+          content: typeof tr.content === "string" ? tr.content : JSON.stringify(tr.content || ""),
+          tool_call_id: tr.tool_use_id,
+        });
+      }
+
+      if (results.length === 0) results.push({ role: "user", content: "" });
+    } else {
+      results.push({ role: "user", content: content ?? "" });
+    }
+  } else if (msg?.role === "assistant") {
+    const { contentStr, toolCalls } = anthropicContentToOpenAI(msg.content);
+    const entry: any = { role: "assistant" as const };
+    if (contentStr) entry.content = contentStr;
+    if (toolCalls.length) entry.tool_calls = toolCalls;
+    results.push(entry);
+  }
+
+  return results;
 }
 
 function anthropicRequestToOpenAI(body: any): any {
@@ -80,14 +200,10 @@ function anthropicRequestToOpenAI(body: any): any {
   }
 
   for (const msg of messages) {
-    if (msg?.role === "user") {
-      openaiMessages.push({ role: "user", content: msg.content });
-    } else if (msg?.role === "assistant") {
-      openaiMessages.push({ role: "assistant", content: msg.content });
-    }
+    openaiMessages.push(...anthropicMessageToOpenAI(msg));
   }
 
-  return {
+  const converted: any = {
     model: body?.model,
     messages: openaiMessages,
     max_tokens: body?.max_tokens,
@@ -95,6 +211,12 @@ function anthropicRequestToOpenAI(body: any): any {
     top_p: body?.top_p,
     stream: body?.stream,
   };
+
+  if (Array.isArray(body?.tools) && body.tools.length > 0) {
+    converted.tools = body.tools.map(anthropicToolToOpenAI);
+  }
+
+  return converted;
 }
 
 // ── OpenAI <-> Anthropic response conversion ─────────────────────────────
@@ -133,18 +255,38 @@ function anthropicResponseToOpenAI(response: any, model: string) {
 }
 
 function openaiResponseToAnthropic(payload: any, model: string) {
-  const content = payload?.choices?.[0]?.message?.content || "";
+  const choice = payload?.choices?.[0];
+  const message = choice?.message || {};
+  const content = message?.content || "";
+  const toolCalls = Array.isArray(message?.tool_calls) ? message.tool_calls : [];
+
+  const contentBlocks: any[] = [];
+
+  if (content) {
+    contentBlocks.push({ type: "text", text: content });
+  } else if (toolCalls.length === 0) {
+    contentBlocks.push({ type: "text", text: "" });
+  }
+
+  for (const tc of toolCalls) {
+    let parsedInput = tc?.function?.arguments;
+    if (typeof parsedInput === "string") {
+      try { parsedInput = JSON.parse(parsedInput); } catch { /* leave as string */ }
+    }
+    contentBlocks.push({
+      type: "tool_use",
+      id: tc?.id || `tooluse_${crypto.randomUUID()}`,
+      name: tc?.function?.name,
+      input: parsedInput || {},
+    });
+  }
+
   return {
     id: payload?.id || `msg_${crypto.randomUUID()}`,
     type: "message",
     role: "assistant",
     model,
-    content: [
-      {
-        type: "text",
-        text: content,
-      },
-    ],
+    content: contentBlocks,
     stop_reason: payload?.choices?.[0]?.finish_reason || "stop",
     usage: {
       input_tokens: payload?.usage?.prompt_tokens || 0,
