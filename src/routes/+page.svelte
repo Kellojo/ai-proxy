@@ -8,7 +8,7 @@
   let loadingStats = false;
 
   const LIVE_REFRESH_MS = 3000;
-  const MAX_BUCKETS = 72;
+  const MAX_BUCKETS = 100;
   const BUCKET_MS = 5 * 60 * 1000;
 
   function formatTime(value: string) {
@@ -117,8 +117,12 @@
 
     if (sorted.length === 0) return [];
 
-    const firstTs = new Date(sorted[0][0]).getTime();
-    const lastTs = new Date(sorted[sorted.length - 1][0]).getTime();
+    const nowMs = Date.now();
+    const bucketedNow = new Date(nowMs);
+    bucketedNow.setUTCSeconds(0, 0);
+    bucketedNow.setUTCMinutes(Math.floor(bucketedNow.getUTCMinutes() / 5) * 5);
+    const endTs = bucketedNow.getTime();
+    const startTs = endTs - MAX_BUCKETS * BUCKET_MS;
 
     const filled: Array<{
       bucket: string;
@@ -129,8 +133,8 @@
       total: number;
     }> = [];
 
-    for (let ts = firstTs; ts <= lastTs; ts += BUCKET_MS) {
-      const key = new Date(ts).toISOString();
+    for (let ts = startTs; ts <= endTs; ts += BUCKET_MS) {
+      const key = toFiveMinuteBucket(new Date(ts).toISOString());
       const data = byBucket.get(key) ?? { ok: 0, warn: 0, error: 0, total: 0 };
       filled.push({
         bucket: key,
@@ -139,7 +143,7 @@
       });
     }
 
-    return filled.slice(-MAX_BUCKETS);
+    return filled;
   }
 
   function readCssVar(name: string, fallback: string) {
@@ -245,6 +249,8 @@
         scales: {
           x: {
             stacked: true,
+            maxBarThickness: 16,
+            categoryPercentage: 0.3,
             ticks: {
               color: textMuted,
               autoSkip: true,
