@@ -5,10 +5,11 @@
   let timelineChart: any = null;
   let ChartCtor: any = null;
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
+  let chartTimer: ReturnType<typeof setInterval> | null = null;
   let loadingStats = false;
 
   const LIVE_REFRESH_MS = 3000;
-  const MAX_BUCKETS = 100;
+  const MAX_BUCKETS = 50;
   const BUCKET_MS = 5 * 60 * 1000;
 
   function formatTime(value: string) {
@@ -304,10 +305,21 @@
       void loadStats();
     }, LIVE_REFRESH_MS);
 
+    // Continuously re-render the chart so the time window slides to "now"
+    // even when no new data has arrived.
+    chartTimer = setInterval(() => {
+      void renderTimelineChart();
+    }, 10000);
+
     return () => {
       if (refreshTimer) {
         clearInterval(refreshTimer);
         refreshTimer = null;
+      }
+
+      if (chartTimer) {
+        clearInterval(chartTimer);
+        chartTimer = null;
       }
 
       if (timelineChart) {
@@ -355,7 +367,6 @@
 
     <section class="card span-12 stack">
       <h2>Request Trends</h2>
-      <p class="muted">5-minute request trend by status class.</p>
 
       {#if !chartRows().length}
         <p class="muted">No timeline data yet.</p>
