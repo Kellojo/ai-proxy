@@ -605,6 +605,7 @@ a:hover {
 }
 
 .entity-table td {
+  overflow: hidden;
   vertical-align: middle;
 }
 
