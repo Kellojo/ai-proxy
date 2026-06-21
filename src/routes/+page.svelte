@@ -27,9 +27,15 @@
     return value;
   }
 
+  function formatCompact(value: number) {
+    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+    if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
+    return value.toLocaleString();
+  }
+
   function formatTokens(value: unknown) {
     const amount = Number(value);
-    return Number.isFinite(amount) ? amount.toLocaleString() : "-";
+    return Number.isFinite(amount) ? formatCompact(amount) : "-";
   }
 
   function formatCost(value: unknown) {
@@ -326,7 +332,7 @@
       <section class="span-12 top-stats" aria-label="Summary statistics">
         <article class="card stack">
           <div class="muted">Total Requests</div>
-          <div class="stat-value">{totalRequests()}</div>
+          <div class="stat-value">{formatCompact(totalRequests())}</div>
         </article>
         <article class="card stack">
           <div class="muted">Total Tokens</div>
