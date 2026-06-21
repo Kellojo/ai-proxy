@@ -8,7 +8,7 @@
   let chartTimer: ReturnType<typeof setInterval> | null = null;
   let loadingStats = false;
 
-  const LIVE_REFRESH_MS = 3000;
+  const LIVE_REFRESH_MS = 1000;
   const MAX_BUCKETS = 50;
   const BUCKET_MS = 5 * 60 * 1000;
 
@@ -299,8 +299,7 @@
     }
   }
 
-  onMount(() => {
-    void loadStats();
+  function startTimers() {
     refreshTimer = setInterval(() => {
       void loadStats();
     }, LIVE_REFRESH_MS);
@@ -309,18 +308,39 @@
     // even when no new data has arrived.
     chartTimer = setInterval(() => {
       void renderTimelineChart();
-    }, 10000);
+    }, LIVE_REFRESH_MS);
+  }
+
+  function stopTimers() {
+    if (refreshTimer) {
+      clearInterval(refreshTimer);
+      refreshTimer = null;
+    }
+    if (chartTimer) {
+      clearInterval(chartTimer);
+      chartTimer = null;
+    }
+  }
+
+  onMount(() => {
+    void loadStats();
+    startTimers();
+
+    // Pause intervals when the tab is hidden, resume when visible again.
+    const handleVisibility = () => {
+      if (document.hidden) {
+        stopTimers();
+      } else {
+        void loadStats();
+        startTimers();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
-      if (refreshTimer) {
-        clearInterval(refreshTimer);
-        refreshTimer = null;
-      }
-
-      if (chartTimer) {
-        clearInterval(chartTimer);
-        chartTimer = null;
-      }
+      document.removeEventListener("visibilitychange", handleVisibility);
+      stopTimers();
 
       if (timelineChart) {
         timelineChart.destroy();
@@ -381,7 +401,7 @@
       <h2>Request Logs</h2>
       <p class="muted">Latest request history with status and latency.</p>
 
-      {#if !stats?.recentRequests?.length}
+      {#if !stats?.recentRequests?.length && !stats?.activeRequests?.length}
         <p class="muted">No request logs yet.</p>
       {:else}
         <div class="table-wrap">
@@ -398,6 +418,26 @@
               </tr>
             </thead>
             <tbody>
+              {#each stats.activeRequests as active}
+                <tr class="running-row">
+                  <td
+                    >{shortTimeLabel(
+                      new Date(active.startedAt).toISOString(),
+                    )}</td
+                  >
+                  <td>{active.providerName || "—"}</td>
+                  <td>{displayModelName(active.model)}</td>
+                  <td>
+                    <span class="status-pill running">
+                      <span class="running-dot"></span>
+                      Running
+                    </span>
+                  </td>
+                  <td>{Math.round((Date.now() - active.startedAt) / 1000)}s</td>
+                  <td>—</td>
+                  <td>—</td>
+                </tr>
+              {/each}
               {#each stats.recentRequests as row}
                 <tr>
                   <td>{formatTime(row.created_at)}</td>

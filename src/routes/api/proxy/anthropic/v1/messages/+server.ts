@@ -22,6 +22,7 @@ import {
   noProviderResponse,
   providerNotFoundResponse,
 } from "$lib/server/common-server";
+import { startRequest, finishRequest } from "$lib/server/active-requests";
 
 async function getModelListForProvider(
   provider: Provider,
@@ -98,16 +99,52 @@ export const POST: RequestHandler = async ({ request }) => {
 
   const model = body?.model || "unknown-model";
 
+  // Resolve provider name for tracking
+  let providerName: string | undefined;
+  if (providerId) {
+    const p = getProvider(providerId);
+    if (!p) {
+      return providerNotFoundResponse();
+    }
+    providerName = p.name;
+  }
+
+  // Register as an active request
+  const runId = startRequest({ model, providerId, providerName });
+
+  try {
+    return await handleAnthropicRequest({
+      startedAt,
+      body,
+      streamRequested,
+      providerId,
+      allProviders,
+      model,
+      virtualKey,
+    });
+  } finally {
+    finishRequest(runId);
+  }
+};
+
+/** Core Anthropic request logic — called after the request is registered as active. */
+async function handleAnthropicRequest(params: {
+  startedAt: number;
+  body: any;
+  streamRequested: boolean;
+  providerId: string | undefined;
+  allProviders: ReturnType<typeof listProviders>;
+  model: string;
+  virtualKey: NonNullable<ReturnType<typeof authenticateVirtualKey>>;
+}) {
+  const { startedAt, body, streamRequested, providerId, allProviders, model, virtualKey } = params;
+
   console.log(
     `[ai-proxy] /anthropic/v1/messages request - model: "${model}", requested providerId: ${providerId || "none"}`,
   );
 
   if (providerId) {
-    const explicitProvider = getProvider(providerId);
-    if (!explicitProvider) {
-      console.log(`[ai-proxy] Provider "${providerId}" not found`);
-      return providerNotFoundResponse();
-    }
+    const explicitProvider = getProvider(providerId)!;
 
     console.log(
       `[ai-proxy] Using explicitly requested provider: "${explicitProvider.name}" (id: ${explicitProvider.id})`,
@@ -252,6 +289,6 @@ export const POST: RequestHandler = async ({ request }) => {
     },
     { status: 502 },
   );
-};
+}
 
 

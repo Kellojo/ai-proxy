@@ -1,6 +1,8 @@
 import { json } from "@sveltejs/kit";
 import { getStats } from "$lib/server/db";
+import { listActive } from "$lib/server/active-requests";
 
 export const GET = async () => {
-  return json(getStats());
+  const stats = getStats();
+  return json({ ...stats, activeRequests: listActive() });
 };
