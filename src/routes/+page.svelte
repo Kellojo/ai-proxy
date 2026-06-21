@@ -45,6 +45,17 @@
     return Number.isFinite(amount) ? `$${amount.toFixed(6)}` : "n/a";
   }
 
+  function formatLatency(ms: number) {
+    if (ms < 0) return "-";
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    const seconds = ms / 1000;
+    if (seconds < 60) return `${seconds.toFixed(1)}s`;
+    const minutes = seconds / 60;
+    if (minutes < 60) return `${minutes.toFixed(1)}min`;
+    const hours = minutes / 60;
+    return `${hours.toFixed(1)}h`;
+  }
+
   function totalRequests() {
     if (stats?.summary?.request_count != null) {
       return Number(stats.summary.request_count) || 0;
@@ -433,7 +444,7 @@
                       Running
                     </span>
                   </td>
-                  <td>{Math.round((Date.now() - active.startedAt) / 1000)}s</td>
+                  <td>{formatLatency(Date.now() - active.startedAt)}</td>
                   <td>—</td>
                   <td>—</td>
                 </tr>
@@ -448,7 +459,7 @@
                       >{row.status_code}</span
                     >
                   </td>
-                  <td>{row.duration_ms} ms</td>
+                  <td>{formatLatency(row.duration_ms)}</td>
                   <td>{formatTokens(row.total_tokens)}</td>
                   <td>{formatCost(row.cost)}</td>
                 </tr>
