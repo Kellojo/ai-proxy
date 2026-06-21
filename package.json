@@ -13,7 +13,7 @@
     "start": "node build",
     "check": "svelte-kit sync && tsc --noEmit",
     "test": "vitest run",
-  "test:watch": "vitest"
+    "test:watch": "vitest"
   },
   "engines": {
     "node": ">=20"

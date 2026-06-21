@@ -414,8 +414,9 @@ a:hover {
 }
 
 /* Ensure dialog titles are highly readable */
-.modal-header h2, .modal-header h3 {
-    color: var(--ink);
+.modal-header h2,
+.modal-header h3 {
+  color: var(--ink);
 }
 
 .modal-footer {
@@ -703,11 +704,9 @@ a:hover {
   height: 9px;
   border-radius: 999px;
   display: inline-block;
-  box-shadow: 0 0 8px currentColor;
 }
 
-.dot.ok,
-.hist-col-segment.ok {
+.dot.ok {
   background-image: linear-gradient(
     0deg,
     var(--successSecondary),
@@ -715,8 +714,7 @@ a:hover {
   );
 }
 
-.dot.warn,
-.hist-col-segment.warn {
+.dot.warn {
   background-image: linear-gradient(
     0deg,
     var(--warningSecondary),
@@ -724,136 +722,8 @@ a:hover {
   );
 }
 
-.dot.error,
-.hist-col-segment.error {
+.dot.error {
   background-image: linear-gradient(0deg, var(--errorSecondary), var(--error));
-}
-
-.histogram-columns {
-  --chart-col-width: 0.25rem;
-  width: max-content;
-  min-width: 100%;
-  overflow: visible;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: var(--chart-col-width);
-  justify-content: start;
-  gap: 0.25rem;
-  padding: 0.5rem 0.4rem;
-}
-
-.hist-chart-surface {
-  position: relative;
-  border: 1px solid var(--borderColor);
-  border-radius: 1rem;
-  background-color: var(--background);
-  -webkit-backdrop-filter: blur(2rem);
-  backdrop-filter: blur(2rem);
-  padding: 1rem;
-  box-shadow: var(--shadow-s);
-  cursor: default;
-  overflow-x: auto;
-  overflow-y: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  transition: border-color 0.1s ease-out;
-  background:
-    repeating-linear-gradient(
-      to top,
-      rgba(139, 148, 158, 0.11) 0,
-      rgba(139, 148, 158, 0.11) 1px,
-      transparent 1px,
-      transparent 42px
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--paper-soft) 56%, transparent) 0%,
-      color-mix(in srgb, var(--paper) 52%, transparent) 100%
-    );
-}
-
-.hist-axis-top,
-.hist-axis-bottom {
-  position: absolute;
-  left: 0.55rem;
-  font-size: 0.72rem;
-  z-index: 1;
-}
-
-.hist-axis-top {
-  top: 0.35rem;
-}
-
-.hist-axis-bottom {
-  bottom: 0.35rem;
-}
-
-.hist-col {
-  width: var(--chart-col-width);
-  display: grid;
-  grid-template-rows: auto 170px;
-  gap: 0.35rem;
-  align-items: end;
-  justify-items: stretch;
-}
-
-.hist-col-value {
-  font-size: 0.75rem;
-  text-align: center;
-  font-weight: 600;
-  display: none;
-}
-
-.hist-col-track {
-  width: 100%;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-  background-color: var(--backgroundLight);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column-reverse;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-  transition:
-    transform 120ms ease-out,
-    box-shadow 120ms ease-out;
-}
-
-.hist-col-segment {
-  width: 100%;
-  transition: filter 120ms ease-out;
-}
-
-.hist-col:hover .hist-col-track {
-  transform: translateY(-2px);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
-    0 8px 14px rgba(0, 0, 0, 0.35);
-}
-
-.hist-col:hover .hist-col-segment {
-  filter: brightness(1.08);
-}
-
-.hist-time-axis {
-  --chart-col-width: 0.25rem;
-  width: max-content;
-  min-width: 100%;
-  overflow: visible;
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: var(--chart-col-width);
-  gap: 0.25rem;
-  padding: 0 0.4rem 0.25rem;
-}
-
-.hist-time-tick {
-  width: var(--chart-col-width);
-  font-size: 0.64rem;
-  line-height: 1;
-  text-align: left;
-  white-space: nowrap;
-  overflow: visible;
 }
 
 .chart-panel {

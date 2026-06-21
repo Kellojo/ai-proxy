@@ -8,6 +8,8 @@
   let loadingStats = false;
 
   const LIVE_REFRESH_MS = 3000;
+  const MAX_BUCKETS = 72;
+  const BUCKET_MS = 5 * 60 * 1000;
 
   function formatTime(value: string) {
     const date = new Date(value);
@@ -74,7 +76,7 @@
     });
   }
 
-  function toFiveMinuteBucket(value: string) {
+  function toFiveMinuteBucket(value: string): string {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
     date.setUTCSeconds(0, 0);
@@ -109,14 +111,35 @@
       byBucket.set(bucket, row);
     }
 
-    return Array.from(byBucket.entries())
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-72)
-      .map(([bucket, values]) => ({
-        bucket,
-        label: shortTimeLabel(bucket),
-        ...values,
-      }));
+    const sorted = Array.from(byBucket.entries()).sort(
+      (a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime(),
+    );
+
+    if (sorted.length === 0) return [];
+
+    const firstTs = new Date(sorted[0][0]).getTime();
+    const lastTs = new Date(sorted[sorted.length - 1][0]).getTime();
+
+    const filled: Array<{
+      bucket: string;
+      label: string;
+      ok: number;
+      warn: number;
+      error: number;
+      total: number;
+    }> = [];
+
+    for (let ts = firstTs; ts <= lastTs; ts += BUCKET_MS) {
+      const key = new Date(ts).toISOString();
+      const data = byBucket.get(key) ?? { ok: 0, warn: 0, error: 0, total: 0 };
+      filled.push({
+        bucket: key,
+        label: shortTimeLabel(key),
+        ...data,
+      });
+    }
+
+    return filled.slice(-MAX_BUCKETS);
   }
 
   function readCssVar(name: string, fallback: string) {
