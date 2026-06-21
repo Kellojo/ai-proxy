@@ -1,28 +1,27 @@
 # AI Proxy
 
-Minimal SvelteKit + TypeScript proxy for multiple AI providers with virtual API keys and SQLite persistence.
+A single entry point for multiple AI providers. Point any OpenAI- or Anthropic-compatible client at the proxy, and it routes your requests through whichever upstream provider has the model you asked for — all behind one virtual API key.
 
-## Features
+## What it does
 
-- Multiple provider config (OpenAI, Anthropic, and generic OpenAI-like variants)
-- Optional Wake-on-LAN for provider before each request
-- Virtual key management in UI (create, update, delete, reroll)
-- OpenAI-compatible proxy endpoint at `/api/proxy/openai/v1/chat/completions`
-- Basic usage stats for providers, models, request timeline, status codes, token usage, and API-reported cost (when available)
-- SQLite storage for easy portability
+- **Multi-provider routing** — register one or more upstream providers (OpenAI, Anthropic, or any OpenAI-compatible endpoint). The proxy auto-selects the first provider that has the model you requested, or you can pin a specific one with a header.
+- **Virtual API keys** — create named keys via the web UI. Each key acts as a single authentication token for all proxy endpoints, so clients never need to know about individual provider keys.
+- **OpenAI & Anthropic API formats** — the proxy exposes both `/api/proxy/openai/v1/` and `/api/proxy/anthropic/v1/` paths, so clients using either format work out of the box.
+- **Model caching** — upstream model lists are cached per provider to reduce API chatter. Bypass the cache with `Cache-Control: no-cache` or `?refresh=1`.
+- **Wake-on-LAN** — optionally send a WOL packet to boot a provider machine before making requests, with configurable retry logic.
+- **Dashboard & stats** — built-in dashboard showing request counts, token usage, costs, per-provider/model breakdowns, and a live request timeline.
+- **SQLite persistence** — all configuration and logs are stored in a single SQLite file for easy portability and backup.
 
-## Run locally
+## Quick start
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open http://localhost:5173
+Open http://localhost:5173, add a provider and a virtual key, then start making requests.
 
-## Run with published container image
-
-You can run the latest published image directly from GHCR:
+## Run with Docker
 
 ```bash
 docker run --rm \
@@ -31,9 +30,7 @@ docker run --rm \
   ghcr.io/kellojo/ai-proxy:latest
 ```
 
-Then open http://localhost:3000
-
-On Windows PowerShell, use:
+On Windows PowerShell:
 
 ```powershell
 docker run --rm `
@@ -55,21 +52,41 @@ services:
     restart: unless-stopped
 ```
 
+Then open http://localhost:3000.
+
 ## Proxy usage
 
-Use virtual key in bearer auth:
+### OpenAI-compatible
 
 ```bash
-curl -X POST http://localhost:5173/api/proxy/openai/v1/chat/completions \
+curl -X POST http://localhost:3000/api/proxy/openai/v1/chat/completions \
   -H "Authorization: Bearer vk_xxx" \
   -H "Content-Type: application/json" \
   -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"hello"}]}'
 ```
 
-Optional provider selection header:
+### Anthropic-compatible
+
+```bash
+curl -X POST http://localhost:3000/api/proxy/anthropic/v1/messages \
+  -H "Authorization: Bearer vk_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"claude-sonnet-4-6-20250514","max_tokens":1024,"messages":[{"role":"user","content":"hello"}]}'
+```
+
+### Provider selection
+
+By default the proxy picks the first matching provider. To target a specific one:
 
 ```bash
 -H "x-provider-id: <provider-id>"
+```
+
+### Using with Claude Code
+
+```bash
+export ANTHROPIC_API_BASE_URL=http://localhost:3000/api/proxy/anthropic/v1
+export ANTHROPIC_API_KEY=vk_xxx
 ```
 
 ## Build container
@@ -79,14 +96,14 @@ docker build -t ai-proxy .
 docker run --rm -p 3000:3000 -v ${PWD}/data:/app/data ai-proxy
 ```
 
-Then open http://localhost:3000
-
 ## Configuration
 
-- `DATABASE_PATH` (optional): custom path for SQLite DB file
-- `PORT` (optional): listen port in container/runtime
-- `WOL_BOOT_WAIT_MS` (optional, default `20000`): wait time after sending WOL before first upstream attempt
-- `WOL_RETRY_ATTEMPTS` (optional, default `8`): retry count while provider is still booting/unreachable
-- `WOL_RETRY_INTERVAL_MS` (optional, default `3000`): delay between startup retries
-- `WOL_PACKET_BURST` (optional, default `3`): number of WOL magic packets sent per wake request
-- `WOL_BURST_INTERVAL_MS` (optional, default `120`): delay between burst packets
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_PATH` | — | Custom path for SQLite DB file |
+| `PORT` | — | Listen port in container/runtime |
+| `WOL_BOOT_WAIT_MS` | `20000` | Wait after WOL before first upstream attempt |
+| `WOL_RETRY_ATTEMPTS` | `8` | Retry count while provider is booting |
+| `WOL_RETRY_INTERVAL_MS` | `3000` | Delay between startup retries |
+| `WOL_PACKET_BURST` | `3` | WOL magic packets per wake request |
+| `WOL_BURST_INTERVAL_MS` | `120` | Delay between burst packets |
