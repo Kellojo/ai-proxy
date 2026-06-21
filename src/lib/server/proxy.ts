@@ -1,6 +1,7 @@
 import type { Provider } from "./types";
 
 const DEFAULT_FETCH_TIMEOUT_MS = 300_000;
+const MAX_REQUEST_BODY_BYTES = 1_000_000; // 1MB
 
 // ── URL helpers ──────────────────────────────────────────────────────────
 
@@ -62,6 +63,8 @@ function openaiRequestToAnthropic(body: any): any {
     model: body.model,
     max_tokens: body.max_tokens,
     temperature: body.temperature,
+    top_p: body.top_p,
+    stream: body.stream,
     system: systemMessage?.content,
     messages: conversationMessages,
   };
@@ -150,26 +153,6 @@ function openaiResponseToAnthropic(payload: any, model: string) {
   };
 }
 
-// ── Header builders ──────────────────────────────────────────────────────
-
-function openAIHeaders(apiKey: string): Record<string, string> {
-  return {
-    "content-type": "application/json",
-    authorization: `Bearer ${apiKey}`,
-  };
-}
-
-function anthropicHeaders(
-  apiKey: string,
-  version?: string,
-): Record<string, string> {
-  return {
-    "content-type": "application/json",
-    "x-api-key": apiKey,
-    "anthropic-version": version || "2023-06-01",
-  };
-}
-
 // ── Unified forward logic ───────────────────────────────────────────────
 
 interface ForwardOptions {
@@ -185,10 +168,18 @@ async function forwardRequest(
 ): Promise<Response> {
   const targetUrl = buildUrl(provider.endpointUrl, options.endpoint);
 
+  const bodyStr = JSON.stringify(options.requestBody);
+  if (bodyStr.length > MAX_REQUEST_BODY_BYTES) {
+    return new Response(JSON.stringify({ error: "Request body too large" }), {
+      status: 413,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
   const response = await fetchWithTimeout(targetUrl, {
     method: "POST",
     headers: options.headers,
-    body: JSON.stringify(options.requestBody),
+    body: bodyStr,
   });
 
   const payload = await response.json().catch(() => ({}));
@@ -228,7 +219,7 @@ export async function forwardChatCompletion(
     const adapted = openaiRequestToAnthropic(body);
     return forwardRequest(provider, {
       endpoint: "/v1/messages",
-      headers: anthropicHeaders(provider.apiKey),
+      headers: { "content-type": "application/json", "x-api-key": provider.apiKey, "anthropic-version": "2023-06-01" },
       requestBody: adapted,
       responseBodyAdapter: anthropicResponseToOpenAI,
     });
@@ -236,7 +227,7 @@ export async function forwardChatCompletion(
 
   return forwardRequest(provider, {
     endpoint: "/v1/chat/completions",
-    headers: openAIHeaders(provider.apiKey),
+    headers: { "content-type": "application/json", authorization: `Bearer ${provider.apiKey}` },
     requestBody: body,
   });
 }
@@ -250,7 +241,7 @@ export async function forwardAnthropicMessages(
   if (provider.kind === "anthropic") {
     return forwardRequest(provider, {
       endpoint: "/v1/messages",
-      headers: anthropicHeaders(provider.apiKey, body?.anthropic_version),
+      headers: { "content-type": "application/json", "x-api-key": provider.apiKey, "anthropic-version": body?.anthropic_version || "2023-06-01" },
       requestBody: body,
     });
   }
@@ -258,7 +249,7 @@ export async function forwardAnthropicMessages(
   const adapted = anthropicRequestToOpenAI(body);
   return forwardRequest(provider, {
     endpoint: "/v1/chat/completions",
-    headers: openAIHeaders(provider.apiKey),
+    headers: { "content-type": "application/json", authorization: `Bearer ${provider.apiKey}` },
     requestBody: adapted,
     responseBodyAdapter: openaiResponseToAnthropic,
   });
