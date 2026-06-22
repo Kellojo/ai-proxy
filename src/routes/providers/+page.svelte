@@ -429,8 +429,8 @@
       <h2 id="create-provider-title">Create Provider</h2>
     </div>
 
-    <div class="row">
-      <div style="flex: 1 1 230px;">
+    <div class="form-grid">
+      <div>
         <label for="provider-name">Name</label>
         <input
           id="provider-name"
@@ -438,7 +438,7 @@
           placeholder="Main OpenAI"
         />
       </div>
-      <div style="flex: 1 1 200px;">
+      <div>
         <label for="provider-kind">Kind</label>
         <select id="provider-kind" bind:value={providerForm.kind}>
           <option value="openai">OpenAI</option>
@@ -446,10 +446,7 @@
           <option value="other">Other OpenAI-like</option>
         </select>
       </div>
-    </div>
-
-    <div class="row">
-      <div style="flex: 1 1 260px;">
+      <div>
         <label for="provider-endpoint">Endpoint URL</label>
         <input
           id="provider-endpoint"
@@ -457,7 +454,7 @@
           placeholder="https://api.openai.com"
         />
       </div>
-      <div style="flex: 1 1 260px;">
+      <div>
         <label for="provider-apikey">API Key / Token</label>
         <input
           id="provider-apikey"
@@ -466,28 +463,27 @@
           placeholder="sk-..."
         />
       </div>
-    </div>
+      <div>
+        <label
+          ><input
+            type="checkbox"
+            bind:checked={providerForm.isDefault}
+            style="width:auto;"
+          /> Default provider</label
+        >
+      </div>
+      <div>
+        <label
+          ><input
+            type="checkbox"
+            bind:checked={providerForm.wolEnabled}
+            style="width:auto;"
+          /> Send Wake-on-LAN before requests</label
+        >
+      </div>
 
-    <div class="row">
-      <label
-        ><input
-          type="checkbox"
-          bind:checked={providerForm.isDefault}
-          style="width:auto;"
-        /> Default provider</label
-      >
-      <label
-        ><input
-          type="checkbox"
-          bind:checked={providerForm.wolEnabled}
-          style="width:auto;"
-        /> Send Wake-on-LAN before requests</label
-      >
-    </div>
-
-    {#if providerForm.wolEnabled}
-      <div class="row">
-        <div style="flex: 1 1 220px;">
+      {#if providerForm.wolEnabled}
+        <div>
           <label for="provider-wol-mac">WOL MAC</label>
           <input
             id="provider-wol-mac"
@@ -495,14 +491,14 @@
             placeholder="00:11:22:33:44:55"
           />
         </div>
-        <div style="flex: 1 1 220px;">
+        <div>
           <label for="provider-wol-broadcast">WOL Broadcast</label>
           <input
             id="provider-wol-broadcast"
             bind:value={providerForm.wolBroadcast}
           />
         </div>
-        <div style="flex: 0 1 120px;">
+        <div>
           <label for="provider-wol-port">WOL Port</label>
           <input
             id="provider-wol-port"
@@ -510,10 +506,10 @@
             type="number"
           />
         </div>
-      </div>
-    {/if}
+      {/if}
+    </div>
 
-    <div class="row modal-footer">
+    <div class="modal-footer">
       <button class="ghost" on:click={closeCreateModal}>Close</button>
       <button on:click|preventDefault={addProvider}>Save Provider</button>
     </div>
@@ -532,8 +528,8 @@
       <h2 id="edit-provider-title">Edit Provider</h2>
     </div>
 
-    <div class="row">
-      <div style="flex: 1 1 230px;">
+    <div class="form-grid">
+      <div>
         <label for="edit-provider-name">Name</label>
         <input
           id="edit-provider-name"
@@ -541,7 +537,7 @@
           placeholder="Main OpenAI"
         />
       </div>
-      <div style="flex: 1 1 200px;">
+      <div>
         <label for="edit-provider-kind">Kind</label>
         <select id="edit-provider-kind" bind:value={editForm.kind}>
           <option value="openai">OpenAI</option>
@@ -549,10 +545,7 @@
           <option value="other">Other OpenAI-like</option>
         </select>
       </div>
-    </div>
-
-    <div class="row">
-      <div style="flex: 1 1 260px;">
+      <div>
         <label for="edit-provider-endpoint">Endpoint URL</label>
         <input
           id="edit-provider-endpoint"
@@ -560,7 +553,7 @@
           placeholder="https://api.openai.com"
         />
       </div>
-      <div style="flex: 1 1 260px;">
+      <div>
         <label for="edit-provider-apikey">API Key / Token (optional)</label>
         <input
           id="edit-provider-apikey"
@@ -569,28 +562,27 @@
           placeholder="Leave blank to keep existing key"
         />
       </div>
-    </div>
+      <div>
+        <label
+          ><input
+            type="checkbox"
+            bind:checked={editForm.isDefault}
+            style="width:auto;"
+          /> Default provider</label
+        >
+      </div>
+      <div>
+        <label
+          ><input
+            type="checkbox"
+            bind:checked={editForm.wolEnabled}
+            style="width:auto;"
+          /> Send Wake-on-LAN before requests</label
+        >
+      </div>
 
-    <div class="row">
-      <label
-        ><input
-          type="checkbox"
-          bind:checked={editForm.isDefault}
-          style="width:auto;"
-        /> Default provider</label
-      >
-      <label
-        ><input
-          type="checkbox"
-          bind:checked={editForm.wolEnabled}
-          style="width:auto;"
-        /> Send Wake-on-LAN before requests</label
-      >
-    </div>
-
-    {#if editForm.wolEnabled}
-      <div class="row">
-        <div style="flex: 1 1 220px;">
+      {#if editForm.wolEnabled}
+        <div>
           <label for="edit-provider-wol-mac">WOL MAC</label>
           <input
             id="edit-provider-wol-mac"
@@ -598,14 +590,14 @@
             placeholder="00:11:22:33:44:55"
           />
         </div>
-        <div style="flex: 1 1 220px;">
+        <div>
           <label for="edit-provider-wol-broadcast">WOL Broadcast</label>
           <input
             id="edit-provider-wol-broadcast"
             bind:value={editForm.wolBroadcast}
           />
         </div>
-        <div style="flex: 0 1 120px;">
+        <div>
           <label for="edit-provider-wol-port">WOL Port</label>
           <input
             id="edit-provider-wol-port"
@@ -613,10 +605,10 @@
             type="number"
           />
         </div>
-      </div>
-    {/if}
+      {/if}
+    </div>
 
-    <div class="row" style="justify-content: flex-end;">
+    <div class="modal-footer">
       <button class="ghost" on:click={closeEditModal}>Close</button>
       <button on:click|preventDefault={saveProviderEdits}>Save Changes</button>
     </div>
