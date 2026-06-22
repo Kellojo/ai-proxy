@@ -249,7 +249,7 @@
     aria-labelledby="create-key-title"
     on:cancel|preventDefault={closeCreateModal}
     on:click={(event) => {
-      if (event.currentTarget === event.target) closeCreateModal();
+      if (event.currentTarget === event.target && document.activeElement !== event.currentTarget && !event.currentTarget.contains(document.activeElement)) closeCreateModal();
     }}
   >
     <div class="modal-header">

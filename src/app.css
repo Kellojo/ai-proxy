@@ -396,6 +396,7 @@ a:hover {
 .modal::backdrop {
   background: rgba(1, 4, 9, 0.56);
   animation: dialog-backdrop-in 140ms ease-out;
+  backdrop-filter: blur(0.25rem);
 }
 
 .modal.is-closing {

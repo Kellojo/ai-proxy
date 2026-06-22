@@ -400,7 +400,7 @@
     aria-labelledby="create-provider-title"
     on:cancel|preventDefault={closeCreateModal}
     on:click={(event) => {
-      if (event.currentTarget === event.target) closeCreateModal();
+      if (event.currentTarget === event.target && document.activeElement !== event.currentTarget && !event.currentTarget.contains(document.activeElement)) closeCreateModal();
     }}
   >
     <div class="modal-header">
@@ -503,7 +503,7 @@
     aria-labelledby="edit-provider-title"
     on:cancel|preventDefault={closeEditModal}
     on:click={(event) => {
-      if (event.currentTarget === event.target) closeEditModal();
+      if (event.currentTarget === event.target && document.activeElement !== event.currentTarget && !event.currentTarget.contains(document.activeElement)) closeEditModal();
     }}
   >
     <div class="modal-header">
