@@ -170,6 +170,17 @@
     createModalClosing = true;
 
     setTimeout(() => {
+      providerForm = {
+        name: "",
+        kind: "openai",
+        endpointUrl: "https://api.openai.com",
+        apiKey: "",
+        isDefault: false,
+        wolEnabled: false,
+        wolMac: "",
+        wolBroadcast: "255.255.255.255",
+        wolPort: 9,
+      };
       showCreateModal = false;
       createModalClosing = false;
     }, DIALOG_ANIMATION_MS);
@@ -207,6 +218,17 @@
     editModalClosing = true;
 
     setTimeout(() => {
+      editForm = {
+        name: "",
+        kind: "openai",
+        endpointUrl: "",
+        apiKey: "",
+        isDefault: false,
+        wolEnabled: false,
+        wolMac: "",
+        wolBroadcast: "255.255.255.255",
+        wolPort: 9,
+      };
       showEditModal = false;
       editModalClosing = false;
       editingProviderId = "";
