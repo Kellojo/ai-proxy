@@ -186,62 +186,57 @@
     {#if error}<div class="error">{error}</div>{/if}
   </div>
 
-  <div class="grid">
-    <section class="card span-12 stack">
-      <h2>Configured Keys</h2>
-      {#if keys.length === 0}
-        <p class="muted">No virtual keys yet.</p>
-      {:else}
-        <div class="table-wrap">
-          <table class="logs-table entity-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Prefix</th>
-                <th>Status</th>
-                <th>Last Used</th>
-                <th>Created</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each keys as key}
-                <tr>
-                  <td><strong>{key.name}</strong></td>
-                  <td>
-                    <span class="provider-endpoint">{key.keyPrefix}...</span>
-                  </td>
-                  <td>
-                    <span class={`status-pill ${key.active ? "ok" : "warn"}`}
-                      >{key.active ? "Active" : "Disabled"}</span
-                    >
-                  </td>
-                  <td>{formatTime(key.lastUsedAt)}</td>
-                  <td>{formatTime(key.createdAt)}</td>
-                  <td>
-                    <div class="table-actions">
-                      <button class="ghost" on:click={() => renameKey(key)}
-                        >Rename</button
-                      >
-                      <button class="ghost" on:click={() => toggleKey(key)}
-                        >{key.active ? "Disable" : "Enable"}</button
-                      >
-                      <button class="alt" on:click={() => rerollKey(key.id)}
-                        >Reroll</button
-                      >
-                      <button class="danger" on:click={() => deleteKey(key.id)}
-                        >Delete</button
-                      >
-                    </div>
-                  </td>
-                </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-      {/if}
-    </section>
-  </div>
+  {#if keys.length === 0}
+    <p class="muted">No virtual keys yet.</p>
+  {:else}
+    <div class="table-wrap card">
+      <table class="logs-table entity-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Prefix</th>
+            <th>Status</th>
+            <th>Last Used</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each keys as key}
+            <tr>
+              <td><strong>{key.name}</strong></td>
+              <td>
+                <span class="provider-endpoint">{key.keyPrefix}...</span>
+              </td>
+              <td>
+                <span class={`status-pill ${key.active ? "ok" : "warn"}`}
+                  >{key.active ? "Active" : "Disabled"}</span
+                >
+              </td>
+              <td>{formatTime(key.lastUsedAt)}</td>
+              <td>{formatTime(key.createdAt)}</td>
+              <td>
+                <div class="table-actions">
+                  <button class="ghost" on:click={() => renameKey(key)}
+                    >Rename</button
+                  >
+                  <button class="ghost" on:click={() => toggleKey(key)}
+                    >{key.active ? "Disable" : "Enable"}</button
+                  >
+                  <button class="alt" on:click={() => rerollKey(key.id)}
+                    >Reroll</button
+                  >
+                  <button class="danger" on:click={() => deleteKey(key.id)}
+                    >Delete</button
+                  >
+                </div>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {/if}
 
   <dialog
     bind:this={createDialog}
@@ -249,7 +244,12 @@
     aria-labelledby="create-key-title"
     on:cancel|preventDefault={closeCreateModal}
     on:click={(event) => {
-      if (event.currentTarget === event.target && document.activeElement !== event.currentTarget && !event.currentTarget.contains(document.activeElement)) closeCreateModal();
+      if (
+        event.currentTarget === event.target &&
+        document.activeElement !== event.currentTarget &&
+        !event.currentTarget.contains(document.activeElement)
+      )
+        closeCreateModal();
     }}
   >
     <div class="modal-header">
