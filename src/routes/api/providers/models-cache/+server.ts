@@ -5,6 +5,7 @@ import {
   MODELS_CACHE_TTL_MS,
   getModelsCacheSnapshot,
   isModelsCacheEnabled,
+  clearModelsCache,
 } from "$lib/server/models-cache";
 
 export const GET: RequestHandler = async () => {
@@ -36,5 +37,12 @@ export const GET: RequestHandler = async () => {
     cacheTtlMs: MODELS_CACHE_TTL_MS,
     entryCount: entries.length,
     entries,
+  });
+};
+
+export const DELETE: RequestHandler = async () => {
+  const removed = clearModelsCache();
+  return json({
+    message: `Cleared ${removed} cache entries.`,
   });
 };

@@ -91,17 +91,31 @@
     await loadProviders();
   }
 
-  async function refreshProvidersIfVisible() {
+  async function clearModelCache() {
     if (
-      typeof document !== "undefined" &&
-      document.visibilityState !== "visible"
+      !confirm(
+        "Are you sure you want to clear the model cache? This will force all providers to refresh their model lists on next check.",
+      )
     ) {
       return;
     }
 
-    await loadProviders();
+    try {
+      const res = await fetch("/api/providers/models-cache", {
+        method: "DELETE",
+      });
+      const payload = await res.json();
+      if (!res.ok) {
+        error = payload.error || "Failed to clear cache";
+        return;
+      }
+      message = payload.message || "Cache cleared successfully";
+      await refreshProviderData();
+    } catch (err) {
+      error = "Failed to clear cache";
+      console.error(err);
+    }
   }
-
   function formatDuration(ms?: number) {
     if (!ms || ms <= 0) return "0s";
 
@@ -326,7 +340,13 @@
           Configure OpenAI, Anthropic, and OpenAI-compatible providers.
         </p>
       </div>
-      <button on:click={openCreateModal}>New Provider</button>
+      <div
+        class="stack"
+        style="display: flex; flex-direction: row; gap: 0.5rem;"
+      >
+        <button class="ghost" on:click={clearModelCache}>Clear Cache</button>
+        <button on:click={openCreateModal}>New Provider</button>
+      </div>
     </div>
     {#if message}<div class="notice">{message}</div>{/if}
     {#if error}<div class="error">{error}</div>{/if}
@@ -422,7 +442,12 @@
     aria-labelledby="create-provider-title"
     on:cancel|preventDefault={closeCreateModal}
     on:click={(event) => {
-      if (event.currentTarget === event.target && document.activeElement !== event.currentTarget && !event.currentTarget.contains(document.activeElement)) closeCreateModal();
+      if (
+        event.currentTarget === event.target &&
+        document.activeElement !== event.currentTarget &&
+        !event.currentTarget.contains(document.activeElement)
+      )
+        closeCreateModal();
     }}
   >
     <div class="modal-header">
@@ -521,7 +546,12 @@
     aria-labelledby="edit-provider-title"
     on:cancel|preventDefault={closeEditModal}
     on:click={(event) => {
-      if (event.currentTarget === event.target && document.activeElement !== event.currentTarget && !event.currentTarget.contains(document.activeElement)) closeEditModal();
+      if (
+        event.currentTarget === event.target &&
+        document.activeElement !== event.currentTarget &&
+        !event.currentTarget.contains(document.activeElement)
+      )
+        closeEditModal();
     }}
   >
     <div class="modal-header">
