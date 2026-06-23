@@ -1,9 +1,19 @@
 <script lang="ts">
-  import type { ProviderForm } from "../types";
+  import type { ProviderForm, ProviderKind } from "../types";
+  import { getDefaultEndpoint } from "../types";
 
   export let formData: ProviderForm;
   export let onFieldChange: (formData: ProviderForm) => void;
   export let isEdit: boolean;
+
+  function onKindChange(newKind: ProviderKind): void {
+    formData.kind = newKind;
+    const defaultUrl = getDefaultEndpoint(newKind);
+    if (defaultUrl) {
+      formData.endpointUrl = defaultUrl;
+    }
+    onFieldChange(formData);
+  }
 </script>
 
 <div class="form-grid">
@@ -18,9 +28,10 @@
   </div>
   <div>
     <label for="provider-kind">Kind</label>
-    <select id="provider-kind" bind:value={formData.kind} onchange={() => onFieldChange(formData)}>
+    <select id="provider-kind" bind:value={formData.kind} onchange={() => onKindChange(formData.kind)}>
       <option value="openai">OpenAI</option>
       <option value="anthropic">Anthropic</option>
+      <option value="openrouter">OpenRouter</option>
       <option value="other">Other OpenAI-like</option>
     </select>
   </div>

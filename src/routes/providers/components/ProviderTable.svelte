@@ -1,5 +1,11 @@
 <script lang="ts">
-  import { providers, loadingProviders, formatDuration, modelPreview, cacheTooltip } from "../providers-store";
+  import {
+    providers,
+    loadingProviders,
+    formatDuration,
+    modelPreview,
+    cacheTooltip,
+  } from "../providers-store";
   import type { Provider } from "../types";
 
   export let onEditProvider: (provider: Provider) => void;
@@ -12,7 +18,9 @@
   <div class="page-header">
     <div class="stack" style="gap: 0.2rem;">
       <h1>Providers</h1>
-      <p class="muted">Configure OpenAI, Anthropic, and OpenAI-compatible providers.</p>
+      <p class="muted">
+        Configure OpenAI, Anthropic, and OpenAI-compatible providers.
+      </p>
     </div>
     <div class="stack" style="display: flex; flex-direction: row; gap: 0.5rem;">
       <button class="ghost" onclick={onClearCache}>Clear Cache</button>
@@ -60,7 +68,10 @@
             </td>
             <td>
               {#if provider.wolEnabled}
-                <span class="wol-detail" title={`${provider.wolMac || ""} via ${provider.wolBroadcast || ""}:${provider.wolPort || ""}`}>
+                <span
+                  class="wol-detail"
+                  title={`${provider.wolMac || ""} via ${provider.wolBroadcast || ""}:${provider.wolPort || ""}`}
+                >
                   {provider.wolMac} via {provider.wolBroadcast}:{provider.wolPort}
                 </span>
               {:else}
@@ -70,9 +81,14 @@
             <td>
               {#if provider.modelCache}
                 <div class="muted">
-                  {provider.modelCache.modelCount} model(s), {formatDuration(provider.modelCache.cacheAgeMs)} old
+                  {provider.modelCache.modelCount} model(s), {formatDuration(
+                    provider.modelCache.cacheAgeMs,
+                  )} old
                 </div>
-                <div class="provider-endpoint cached-model-list" title={cacheTooltip(provider)}>
+                <div
+                  class="provider-endpoint cached-model-list"
+                  title={cacheTooltip(provider)}
+                >
                   {modelPreview(provider.modelCache.modelIds)}
                 </div>
               {:else}
@@ -81,8 +97,13 @@
             </td>
             <td>
               <div class="table-actions">
-                <button class="ghost" onclick={() => onEditProvider(provider)}>Edit</button>
-                <button class="danger" onclick={() => onDeleteProvider(provider.id)}>Delete</button>
+                <button class="ghost" onclick={() => onEditProvider(provider)}
+                  >Edit</button
+                >
+                <button
+                  class="danger"
+                  onclick={() => onDeleteProvider(provider.id)}>Delete</button
+                >
               </div>
             </td>
           </tr>

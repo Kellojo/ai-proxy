@@ -2,7 +2,20 @@
 export const DEFAULT_ENDPOINT = "https://api.openai.com";
 
 /** Supported provider kinds (API backends). */
-export type ProviderKind = "openai" | "anthropic" | "other";
+export type ProviderKind = "openai" | "anthropic" | "openrouter" | "other";
+
+/** Default endpoint URLs per provider kind. Add new kinds here to get auto-fill on creation. */
+export const providerDefaults: Record<ProviderKind, { defaultEndpoint: string }> = {
+  openai: { defaultEndpoint: "https://api.openai.com" },
+  anthropic: { defaultEndpoint: "https://api.anthropic.com" },
+  openrouter: { defaultEndpoint: "https://openrouter.ai/api/v1" },
+  other: { defaultEndpoint: "" },
+};
+
+/** Returns the default endpoint URL for a given provider kind. */
+export function getDefaultEndpoint(kind: ProviderKind): string {
+  return providerDefaults[kind]?.defaultEndpoint ?? "";
+}
 
 /** Cache metadata for a provider's model list. */
 export interface ProviderModelCache {
@@ -53,7 +66,7 @@ export function createEmptyProviderForm(): ProviderForm {
   return {
     name: "",
     kind: "openai",
-    endpointUrl: DEFAULT_ENDPOINT,
+    endpointUrl: getDefaultEndpoint("openai"),
     apiKey: "",
     isDefault: false,
     wolEnabled: false,
