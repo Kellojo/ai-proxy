@@ -21,6 +21,9 @@
       <a href="/" class:active={isActive("/")}>Dashboard</a>
 
       <a href="/providers" class:active={isActive("/providers")}>Providers</a>
+      <a href="/model-mappings" class:active={isActive("/model-mappings")}
+        >Model Mappings</a
+      >
       <a href="/virtual-keys" class:active={isActive("/virtual-keys")}
         >Virtual Keys</a
       >

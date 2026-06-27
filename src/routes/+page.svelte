@@ -402,7 +402,7 @@
                       <div class="muted"></div>
                     </div>
                   </td>
-                  <td style="width:120px">
+                  <td style="width:160px">
                     <div class="cell-stack">
                       <div>— <span class="muted">tokens</span></div>
                       <div class="muted">—</div>
@@ -421,7 +421,11 @@
                   <td>
                     <div class="cell-stack">
                       <div>{row.provider_name}</div>
-                      <div class="muted">{displayModelName(row.model)}</div>
+                      {#if row.remapped_model && row.remapped_model !== row.model}
+                        <span style="font-size:.85rem;white-space:nowrap" class="muted">{displayModelName(row.model)} &gt; {displayModelName(row.remapped_model)}</span>
+                      {:else}
+                        <div class="muted">{displayModelName(row.model)}</div>
+                      {/if}
                     </div>
                   </td>
                   <td>
@@ -440,7 +444,7 @@
                       <div class="muted"></div>
                     </div>
                   </td>
-                  <td style="width:120px">
+                  <td style="width:160px">
                     <div class="cell-stack">
                       <div>{formatTokens(row.total_tokens)} <span class="muted">tokens</span></div>
                       <div class="muted">{formatCost(row.cost)}</div>

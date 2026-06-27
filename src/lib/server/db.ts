@@ -45,6 +45,12 @@ db.exec(`
     FOREIGN KEY(provider_id) REFERENCES providers(id) ON DELETE SET NULL,
     FOREIGN KEY(virtual_key_id) REFERENCES virtual_keys(id) ON DELETE SET NULL
   );
+
+  CREATE TABLE IF NOT EXISTS model_mappings (
+    id TEXT PRIMARY KEY,
+    source_model TEXT NOT NULL UNIQUE,
+    target_model TEXT NOT NULL
+  );
 `);
 
 const requestLogColumns = db
@@ -100,6 +106,12 @@ if (!hasRequestLogColumn("total_tokens")) {
 
 if (!hasRequestLogColumn("cost")) {
   db.exec("ALTER TABLE request_logs ADD COLUMN cost REAL");
+}
+
+if (!hasRequestLogColumn("remapped_model")) {
+  db.exec(
+    "ALTER TABLE request_logs ADD COLUMN remapped_model TEXT DEFAULT ''",
+  );
 }
 
 function mapProvider(row: any): Provider {
@@ -354,12 +366,13 @@ export function logRequest(input: {
   completionTokens?: number;
   totalTokens?: number;
   cost?: number;
+  remappedModel?: string;
 }): void {
   db.prepare(
     `INSERT INTO request_logs (
       id, provider_id, model, status_code, duration_ms, virtual_key_id,
-      prompt_tokens, completion_tokens, total_tokens, cost, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      prompt_tokens, completion_tokens, total_tokens, cost, remapped_model, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     randomUUID(),
     input.providerId || null,
@@ -371,6 +384,7 @@ export function logRequest(input: {
     input.completionTokens ?? null,
     input.totalTokens ?? null,
     input.cost ?? null,
+    input.remappedModel || "",
     new Date().toISOString(),
   );
 }
@@ -402,9 +416,104 @@ export function getStats() {
 
   const recentRequests = db
     .prepare(
-      `SELECT r.created_at, r.status_code, r.model, r.duration_ms, r.prompt_tokens, r.completion_tokens, r.total_tokens, r.cost, r.virtual_key_id, COALESCE(vk.name, 'Unauthenticated') AS key_name, COALESCE(p.name, '—') AS provider_name FROM request_logs r LEFT JOIN providers p ON p.id = r.provider_id LEFT JOIN virtual_keys vk ON vk.id = r.virtual_key_id ORDER BY r.created_at DESC LIMIT 50`,
+      `SELECT r.created_at, r.status_code, r.model, r.duration_ms, r.prompt_tokens, r.completion_tokens, r.total_tokens, r.cost, r.remapped_model, r.virtual_key_id, COALESCE(vk.name, 'Unauthenticated') AS key_name, COALESCE(p.name, '—') AS provider_name FROM request_logs r LEFT JOIN providers p ON p.id = r.provider_id LEFT JOIN virtual_keys vk ON vk.id = r.virtual_key_id ORDER BY r.created_at DESC LIMIT 50`,
     )
     .all();
 
   return { summary, providerUsage, modelUsage, requestsTimeline, recentRequests };
+}
+
+// ── Model Migrations ──────────────────────────────────────────────────────
+
+function tableExists(name: string): boolean {
+  const row = db
+    .prepare(
+      "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name=?",
+    )
+    .get(name) as { count: number };
+  return row.count > 0;
+}
+
+if (!tableExists("model_mappings")) {
+  db.exec(`
+    CREATE TABLE model_mappings (
+      id TEXT PRIMARY KEY,
+      source_model TEXT NOT NULL UNIQUE,
+      target_model TEXT NOT NULL
+    );
+  `);
+}
+
+export interface ModelMapping {
+  id: string;
+  sourceModel: string;
+  targetModel: string;
+}
+
+function mapModelMapping(row: any): ModelMapping {
+  return {
+    id: row.id,
+    sourceModel: row.source_model,
+    targetModel: row.target_model,
+  };
+}
+
+export function listModelMappings(): ModelMapping[] {
+  const rows = db
+    .prepare(
+      "SELECT * FROM model_mappings ORDER BY source_model ASC",
+    )
+    .all();
+  return rows.map(mapModelMapping);
+}
+
+export function createOrUpdateModelMapping(sourceModel: string, targetModel: string): ModelMapping | undefined {
+  if (!sourceModel.trim() || !targetModel.trim()) {
+    throw new Error("source_model and target_model are required");
+  }
+
+  const id = randomUUID();
+
+  db.prepare(
+    `INSERT INTO model_mappings (id, source_model, target_model) VALUES (?, ?, ?)
+     ON CONFLICT(source_model) DO UPDATE SET target_model = excluded.target_model`,
+  ).run(id, sourceModel.trim(), targetModel.trim());
+
+  const row = db
+    .prepare("SELECT * FROM model_mappings WHERE source_model = ?")
+    .get(sourceModel.trim());
+
+  return row ? mapModelMapping(row) : undefined;
+}
+
+export function deleteModelMapping(id: string): boolean {
+  const result = db.prepare("DELETE FROM model_mappings WHERE id = ?").run(id);
+  return result.changes > 0;
+}
+
+let cachedMappings: Map<string, string> | null = null;
+
+function getMappingCache(): Map<string, string> {
+  if (!cachedMappings) {
+    cachedMappings = new Map();
+    const mappings = listModelMappings();
+    for (const m of mappings) {
+      cachedMappings.set(m.sourceModel.toLowerCase(), m.targetModel);
+    }
+  }
+  return cachedMappings;
+}
+
+export function resolveModelMapping(model: string): string {
+  const cache = getMappingCache();
+  const lower = model.toLowerCase().trim();
+  if (cache.has(lower)) {
+    console.log(`[ai-proxy] Model remap: "${model}" -> "${cache.get(lower)}"`);
+    return cache.get(lower)!;
+  }
+  return model;
+}
+
+export function invalidateModelMappingCache(): void {
+  cachedMappings = null;
 }

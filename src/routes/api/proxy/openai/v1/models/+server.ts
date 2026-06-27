@@ -5,6 +5,7 @@ import {
   getProvider,
   listProviders,
   logRequest,
+  resolveModelMapping,
 } from "$lib/server/db";
 import { extractBearer } from "$lib/server/keys";
 import { forwardModelList } from "$lib/server/proxy";
@@ -111,6 +112,22 @@ export const GET: RequestHandler = async ({ request }) => {
       .filter((model) => typeof model?.id === "string" && model.id.length > 0)
       .map((model) => ({ ...model, providerId: result.provider.id, providerName: result.provider.name })),
   );
+
+  // Append remapped aliases pointing to the same upstream models
+  const { listModelMappings } = await import("$lib/server/db");
+  for (const mapping of listModelMappings()) {
+    if (aggregatedModels.some((m) => m.id === mapping.targetModel)) {
+      aggregatedModels.push({
+        id: mapping.sourceModel,
+        object: "model",
+        created: undefined as any,
+        owned_by: undefined as any,
+        providerId: undefined as any,
+        providerName: undefined as any,
+        _is_alias: true,
+      });
+    }
+  }
 
   return json({ object: "list", data: aggregatedModels, meta: { providersQueried: sortedProviders.length } });
 };

@@ -34,14 +34,14 @@ body {
   color: var(--ink);
   background:
     radial-gradient(
-      circle at 16% -12%,
+      ellipse at 15% 30%,
       rgba(163, 113, 247, 0.14) 0,
-      transparent 34%
+      transparent 60%
     ),
     radial-gradient(
-      circle at 88% 0%,
+      ellipse at 85% 20%,
       rgba(137, 87, 229, 0.1) 0,
-      transparent 28%
+      transparent 55%
     ),
     linear-gradient(180deg, var(--bg-2) 0%, var(--bg) 44%), var(--bg);
   min-height: 100vh;

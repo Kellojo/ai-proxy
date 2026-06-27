@@ -38,5 +38,6 @@ export interface RequestLog {
   totalTokens?: number;
   cost?: number;
   virtualKeyId?: string;
+  remappedModel?: string;
   createdAt: string;
 }

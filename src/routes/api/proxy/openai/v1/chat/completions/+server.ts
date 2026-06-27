@@ -6,6 +6,7 @@ import {
   getProvider,
   listProviders,
   logRequest,
+  resolveModelMapping,
 } from "$lib/server/db";
 import { extractBearer } from "$lib/server/keys";
 import { forwardChatCompletion } from "$lib/server/proxy";
@@ -43,6 +44,12 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   const model = body?.model || "unknown-model";
+  const resolvedModel = resolveModelMapping(model);
+
+  // Update the request body to use the remapped model when forwarding upstream
+  if (resolvedModel !== model) {
+    body.model = resolvedModel;
+  }
 
   function resolveProviderId(req: any): string | undefined {
     return (
@@ -71,7 +78,7 @@ export const POST: RequestHandler = async ({ request }) => {
   const runId = startRequest({ model, providerId: body.providerId || undefined, providerName, virtualKey: virtualKey.name });
 
   try {
-    return await handleAuthenticatedRequest({ startedAt, body, allProviders, model, virtualKey,       providerId: resolveProviderId(request) });
+    return await handleAuthenticatedRequest({ startedAt, body, allProviders, model, virtualKey,       providerId: resolveProviderId(request), resolvedModel });
   } finally {
     finishRequest(runId);
   }
@@ -84,8 +91,9 @@ async function handleAuthenticatedRequest(params: {
   model: string;
   virtualKey: NonNullable<ReturnType<typeof authenticateVirtualKey>>;
   providerId?: string | null;
+  resolvedModel?: string;
 }) {
-  const { startedAt, body, allProviders, model, virtualKey } = params;
+  const { startedAt, body, allProviders, model, virtualKey, resolvedModel } = params;
 
   console.log(
     `[ai-proxy] /chat/completions request - model: "${model}"`,
@@ -112,6 +120,7 @@ async function handleAuthenticatedRequest(params: {
         statusCode,
         durationMs: Date.now() - startedAt,
         virtualKeyId: virtualKey.id,
+        remappedModel: resolvedModel,
       });
 
       console.log(
@@ -127,7 +136,7 @@ async function handleAuthenticatedRequest(params: {
       );
     }
 
-    return await processResponse(upstream, model, explicitProvider.id, body.stream === true, virtualKey.id, startedAt);
+    return await processResponse(upstream, model, explicitProvider.id, body.stream === true, virtualKey.id, startedAt, resolvedModel);
   }
 
   const providersToTry = allProviders;
@@ -154,6 +163,7 @@ async function handleAuthenticatedRequest(params: {
           statusCode: upstream.status,
           durationMs: Date.now() - startedAt,
           virtualKeyId: virtualKey.id,
+          remappedModel: resolvedModel,
         });
 
         console.log(
@@ -176,6 +186,7 @@ async function handleAuthenticatedRequest(params: {
           statusCode: upstream.status,
           durationMs: Date.now() - startedAt,
           virtualKeyId: virtualKey.id,
+          remappedModel: resolvedModel,
           promptTokens: usage.promptTokens || undefined,
           completionTokens: usage.completionTokens || undefined,
           totalTokens: usage.totalTokens || undefined,
@@ -209,6 +220,7 @@ async function handleAuthenticatedRequest(params: {
         statusCode: upstream.status,
         durationMs: Date.now() - startedAt,
         virtualKeyId: virtualKey.id,
+        remappedModel: resolvedModel,
         ...metrics,
       });
 
@@ -265,6 +277,7 @@ async function processResponse(
   streamRequested: boolean,
   virtualKeyId: string,
   startedAt: number,
+  remappedModel?: string,
 ): Promise<Response> {
   const statusCode = upstream.status;
   const isEventStream = (upstream.headers.get("content-type") || "").toLowerCase().includes("text/event-stream");
@@ -274,7 +287,7 @@ async function processResponse(
     const usage = await aggregateStreamUsage(responseText);
 
     logRequest({
-      providerId, model, statusCode, durationMs: Date.now() - startedAt, virtualKeyId,
+      providerId, model, statusCode, durationMs: Date.now() - startedAt, virtualKeyId, remappedModel,
       promptTokens: usage.promptTokens || undefined,
       completionTokens: usage.completionTokens || undefined,
       totalTokens: usage.totalTokens || undefined,
@@ -297,7 +310,7 @@ async function processResponse(
     Object.assign(metrics, extractOpenAIUsageMetrics(payload));
   } catch { /* ignore */ }
 
-  logRequest({ providerId, model, statusCode, durationMs: Date.now() - startedAt, virtualKeyId, ...metrics });
+  logRequest({ providerId, model, statusCode, durationMs: Date.now() - startedAt, virtualKeyId, remappedModel, ...metrics });
 
   return new Response(textContent, { status: statusCode, headers: { "content-type": upstream.headers.get("content-type") || "application/json" } });
 }
