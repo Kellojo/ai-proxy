@@ -1,5 +1,19 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import {
+    formatTime,
+    statusTone,
+    displayModelName,
+    formatCompact,
+    formatTokens,
+    formatCost,
+    formatLatency,
+    formatTimeAgo,
+    shortTimeLabel,
+    toFiveMinuteBucket,
+    readCssVar,
+  } from "$lib/helpers";
+
   let stats: any = null;
   let timelineCanvas: HTMLCanvasElement | null = null;
   let timelineChart: any = null;
@@ -11,96 +25,6 @@
   const LIVE_REFRESH_MS = 1000;
   const MAX_BUCKETS = 50;
   const BUCKET_MS = 5 * 60 * 1000;
-
-  function formatTime(value: string) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-  }
-
-  function statusTone(status: number) {
-    if (status >= 500) return "error";
-    if (status >= 400) return "warn";
-    return "ok";
-  }
-
-  function displayModelName(value: string) {
-    if (value === "__models__" || value === "models:list") return "Models List";
-    return value;
-  }
-
-  function formatCompact(value: number) {
-    if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
-    if (value >= 1_000) return `${(value / 1_000).toFixed(1)}k`;
-    return value.toLocaleString();
-  }
-
-  function formatTokens(value: unknown) {
-    const amount = Number(value);
-    return Number.isFinite(amount) ? formatCompact(amount) : "-";
-  }
-
-  function formatCost(value: unknown) {
-    if (value == null) return "n/a";
-    const amount = Number(value);
-    return Number.isFinite(amount) ? `$${amount.toFixed(6)}` : "n/a";
-  }
-
-  function formatLatency(ms: number) {
-    if (ms < 0) return "-";
-    if (ms < 1000) return `${Math.round(ms)}ms`;
-    const seconds = ms / 1000;
-    if (seconds < 60) return `${seconds.toFixed(1)}s`;
-    const minutes = seconds / 60;
-    if (minutes < 60) return `${minutes.toFixed(1)}min`;
-    const hours = minutes / 60;
-    return `${hours.toFixed(1)}h`;
-  }
-
-  function totalRequests() {
-    if (stats?.summary?.request_count != null) {
-      return Number(stats.summary.request_count) || 0;
-    }
-
-    if (!stats?.providerUsage?.length) return 0;
-    return stats.providerUsage.reduce(
-      (sum: number, row: { request_count: number }) =>
-        sum + (row.request_count || 0),
-      0,
-    );
-  }
-
-  function totalTokens() {
-    return Number(stats?.summary?.total_tokens || 0);
-  }
-
-  function totalCost() {
-    return stats?.summary?.total_cost;
-  }
-
-  function activeProviders() {
-    return stats?.providerUsage?.length || 0;
-  }
-
-  function activeModels() {
-    return stats?.modelUsage?.length || 0;
-  }
-
-  function shortTimeLabel(value: string) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  }
-
-  function toFiveMinuteBucket(value: string): string {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    date.setUTCSeconds(0, 0);
-    date.setUTCMinutes(Math.floor(date.getUTCMinutes() / 5) * 5);
-    return date.toISOString();
-  }
 
   function chartRows() {
     const timeline = stats?.requestsTimeline;
@@ -164,12 +88,33 @@
     return filled;
   }
 
-  function readCssVar(name: string, fallback: string) {
-    if (typeof window === "undefined") return fallback;
-    const value = getComputedStyle(document.documentElement)
-      .getPropertyValue(name)
-      .trim();
-    return value || fallback;
+  function totalRequests() {
+    if (stats?.summary?.request_count != null) {
+      return Number(stats.summary.request_count) || 0;
+    }
+
+    if (!stats?.providerUsage?.length) return 0;
+    return stats.providerUsage.reduce(
+      (sum: number, row: { request_count: number }) =>
+        sum + (row.request_count || 0),
+      0,
+    );
+  }
+
+  function totalTokens() {
+    return Number(stats?.summary?.total_tokens || 0);
+  }
+
+  function totalCost() {
+    return stats?.summary?.total_cost;
+  }
+
+  function activeProviders() {
+    return stats?.providerUsage?.length || 0;
+  }
+
+  function activeModels() {
+    return stats?.modelUsage?.length || 0;
   }
 
   async function ensureChartLib() {
@@ -419,49 +364,85 @@
           <table class="logs-table">
             <thead>
               <tr>
-                <th>Time</th>
-                <th>Provider</th>
-                <th>Model</th>
+                <th>Key / Time</th>
+                <th>Provider / Model</th>
                 <th>Status</th>
                 <th>Latency</th>
-                <th>Tokens</th>
-                <th>Cost</th>
+                <th>Tokens / Cost</th>
               </tr>
             </thead>
             <tbody>
               {#each stats.activeRequests as active}
                 <tr class="running-row">
-                  <td
-                    >{shortTimeLabel(
-                      new Date(active.startedAt).toISOString(),
-                    )}</td
-                  >
-                  <td>{active.providerName || "—"}</td>
-                  <td>{displayModelName(active.model)}</td>
                   <td>
-                    <span class="status-pill running">
-                      <span class="running-dot"></span>
-                      Running
-                    </span>
+                    <div class="cell-stack">
+                      <div>{active.virtualKey || "—"}</div>
+                      <div class="muted">{formatTimeAgo(active.startedAt)}</div>
+                    </div>
                   </td>
-                  <td>{formatLatency(Date.now() - active.startedAt)}</td>
-                  <td>—</td>
-                  <td>—</td>
+                  <td>
+                    <div class="cell-stack">
+                      <div>{active.providerName || "—"}</div>
+                      <div class="muted">{displayModelName(active.model)}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cell-stack">
+                      <span class="status-pill running">
+                        <span class="running-dot"></span>
+                        Running
+                      </span>
+                      <div></div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cell-stack">
+                      <div>{formatLatency(Date.now() - active.startedAt)}</div>
+                      <div class="muted"></div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cell-stack">
+                      <div>—</div>
+                      <div class="muted">—</div>
+                    </div>
+                  </td>
                 </tr>
               {/each}
               {#each stats.recentRequests as row}
                 <tr>
-                  <td>{formatTime(row.created_at)}</td>
-                  <td>{row.provider_name}</td>
-                  <td>{displayModelName(row.model)}</td>
                   <td>
-                    <span class={`status-pill ${statusTone(row.status_code)}`}
-                      >{row.status_code}</span
-                    >
+                    <div class="cell-stack">
+                      <div>{row.key_name}</div>
+                      <div class="muted">{formatTimeAgo(row.created_at)}</div>
+                    </div>
                   </td>
-                  <td>{formatLatency(row.duration_ms)}</td>
-                  <td>{formatTokens(row.total_tokens)}</td>
-                  <td>{formatCost(row.cost)}</td>
+                  <td>
+                    <div class="cell-stack">
+                      <div>{row.provider_name}</div>
+                      <div class="muted">{displayModelName(row.model)}</div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cell-stack">
+                      <span class={`status-pill ${statusTone(row.status_code)}`}>
+                        {row.status_code}
+                      </span>
+                      <div></div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cell-stack">
+                      <div>{formatLatency(row.duration_ms)}</div>
+                      <div class="muted"></div>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="cell-stack">
+                      <div>{formatTokens(row.total_tokens)}</div>
+                      <div class="muted">{formatCost(row.cost)}</div>
+                    </div>
+                  </td>
                 </tr>
               {/each}
             </tbody>

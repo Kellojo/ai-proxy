@@ -2,23 +2,21 @@
     import ProviderForm from './ProviderForm.svelte';
     import { addProvider } from '../providers-store';
     import { createEmptyProviderForm, type ProviderForm as ProviderFormType } from '../types';
+    import { onDestroy } from 'svelte';
 
     export let show: boolean;
     export let onClose: () => void;
 
     let dialog: HTMLDialogElement;
     let form: ProviderFormType = createEmptyProviderForm();
-    let modalClosing = false;
-
-    const DIALOG_ANIMATION_MS = 140;
 
     function closeModal(): void {
-        if (modalClosing || !show) return;
-        modalClosing = true;
+        if (!dialog?.open) return;
         setTimeout(() => {
             form = createEmptyProviderForm();
             onClose();
-        }, DIALOG_ANIMATION_MS);
+            dialog.close();
+        }, 140);
     }
 
     async function handleSave(): Promise<void> {
@@ -26,35 +24,20 @@
         closeModal();
     }
 
-    $: if (show && dialog && !dialog.open) dialog.showModal();
-    $: if (!show && dialog?.open) dialog.close();
+    $: if (show && dialog) setTimeout(() => dialog.showModal(), 5);
+
+    onDestroy(() => {
+        dialog?.close();
+    });
 </script>
 
-<dialog
-    bind:this={dialog}
-    class="modal stack {modalClosing && 'is-closing'}"
-    aria-labelledby="create-provider-title"
-    oncancel={(e) => { e.preventDefault(); closeModal(); }}
-    onclick={(e) => {
-        if (e.currentTarget === e.target && (document.activeElement === dialog || !dialog.contains(document.activeElement))) {
-            closeModal();
-        }
-    }}
->
-    <div class="modal-header">
-        <h2 id="create-provider-title">Create Provider</h2>
-    </div>
+<dialog bind:this={dialog} class="modal stack" aria-labelledby="create-provider-title">
+    <div class="modal-header"><h2 id="create-provider-title">Create Provider</h2></div>
 
-    <ProviderForm
-        bind:formData={form}
-        onFieldChange={() => {}}
-        isEdit={false}
-    />
+    <ProviderForm bind:formData={form} onFieldChange={() => {}} isEdit={false} />
 
     <div class="modal-footer">
         <button class="ghost" onclick={closeModal}>Close</button>
-        <button onclick={handleSave}>
-            Save Provider
-        </button>
+        <button onclick={handleSave}>Save Provider</button>
     </div>
 </dialog>

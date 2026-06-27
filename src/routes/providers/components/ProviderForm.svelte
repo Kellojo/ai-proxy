@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ProviderForm, ProviderKind } from "../types";
-  import { getDefaultEndpoint } from "../types";
+  import { getDefaultEndpoint, PROVIDER_KINDS } from "../types";
 
   export let formData: ProviderForm;
   export let onFieldChange: (formData: ProviderForm) => void;
@@ -28,12 +28,11 @@
   </div>
   <div>
     <label for="provider-kind">Kind</label>
-    <select id="provider-kind" bind:value={formData.kind} onchange={() => onKindChange(formData.kind)}>
-      <option value="openai">OpenAI</option>
-      <option value="anthropic">Anthropic</option>
-      <option value="openrouter">OpenRouter</option>
-      <option value="other">Other OpenAI-like</option>
-    </select>
+      <select id="provider-kind" bind:value={formData.kind} onchange={() => onKindChange(formData.kind)}>
+        {#each PROVIDER_KINDS as kindOption}
+          <option value={kindOption.value}>{kindOption.label}</option>
+        {/each}
+      </select>
   </div>
   <div>
     <label for="provider-endpoint">Endpoint URL</label>
@@ -64,43 +63,4 @@
       /> Default provider</label
     >
   </div>
-  <div>
-    <label>
-      <input
-        type="checkbox"
-        bind:checked={formData.wolEnabled}
-        style="width:auto;"
-        onchange={() => onFieldChange(formData)}
-      /> Send Wake-on-LAN before requests</label
-    >
-  </div>
-
-  {#if formData.wolEnabled}
-    <div>
-      <label for="provider-wol-mac">WOL MAC</label>
-      <input
-        id="provider-wol-mac"
-        bind:value={formData.wolMac}
-        placeholder="00:11:22:33:44:55"
-        oninput={() => onFieldChange(formData)}
-      />
-    </div>
-    <div>
-      <label for="provider-wol-broadcast">WOL Broadcast</label>
-      <input
-        id="provider-wol-broadcast"
-        bind:value={formData.wolBroadcast}
-        oninput={() => onFieldChange(formData)}
-      />
-    </div>
-    <div>
-      <label for="provider-wol-port">WOL Port</label>
-      <input
-        id="provider-wol-port"
-        bind:value={formData.wolPort}
-        type="number"
-        onchange={() => onFieldChange(formData)}
-      />
-    </div>
-  {/if}
 </div>

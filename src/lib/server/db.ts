@@ -17,14 +17,10 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS providers (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
-    kind TEXT NOT NULL,
+    kind TEXT NOT NULL     CHECK(kind = 'openai' OR kind = 'openrouter' OR kind = 'openai-compatible'),
     endpoint_url TEXT NOT NULL,
     api_key TEXT NOT NULL,
     is_default INTEGER NOT NULL DEFAULT 0,
-    wol_enabled INTEGER NOT NULL DEFAULT 0,
-    wol_mac TEXT,
-    wol_broadcast TEXT,
-    wol_port INTEGER,
     created_at TEXT NOT NULL
   );
 
@@ -114,10 +110,6 @@ function mapProvider(row: any): Provider {
     endpointUrl: row.endpoint_url,
     apiKey: row.api_key,
     isDefault: !!row.is_default,
-    wolEnabled: !!row.wol_enabled,
-    wolMac: row.wol_mac || undefined,
-    wolBroadcast: row.wol_broadcast || undefined,
-    wolPort: row.wol_port || undefined,
     createdAt: row.created_at,
   };
 }
@@ -152,6 +144,37 @@ export function getDefaultProvider(): Provider | undefined {
   return row ? mapProvider(row) : undefined;
 }
 
+/** Validate provider input for both creation and update operations. */
+export function validateProviderInput(
+  value: any,
+  options: { requireApiKey?: boolean } = {},
+): ProviderInput | null {
+  if (!value?.name || !value?.kind || !value?.endpointUrl) {
+    throw new Error("name, kind and endpointUrl are required");
+  }
+
+  const apiKey =
+    typeof value.apiKey === "string" && value.apiKey.trim().length > 0
+      ? value.apiKey
+      : undefined;
+
+  if (options.requireApiKey && !apiKey) {
+    throw new Error("apiKey is required");
+  }
+
+  if (!["openai", "openrouter", "openai-compatible"].includes(value.kind)) {
+    throw new Error("kind must be one of: openai, openrouter, openai-compatible");
+  }
+
+  return {
+    name: value.name,
+    kind: value.kind,
+    endpointUrl: value.endpointUrl,
+    apiKey,
+    isDefault: !!value.isDefault,
+  };
+}
+
 export function createProvider(input: ProviderInput): Provider {
   const id = randomUUID();
   const createdAt = new Date().toISOString();
@@ -162,22 +185,9 @@ export function createProvider(input: ProviderInput): Provider {
     }
 
     db.prepare(
-      `INSERT INTO providers
-      (id, name, kind, endpoint_url, api_key, is_default, wol_enabled, wol_mac, wol_broadcast, wol_port, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    ).run(
-      id,
-      input.name,
-      input.kind,
-      input.endpointUrl,
-      input.apiKey,
-      input.isDefault ? 1 : 0,
-      input.wolEnabled ? 1 : 0,
-      input.wolMac || null,
-      input.wolBroadcast || null,
-      input.wolPort || null,
-      createdAt,
-    );
+      `INSERT INTO providers (id, name, kind, endpoint_url, api_key, is_default, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(id, input.name, input.kind, input.endpointUrl, input.apiKey, input.isDefault ? 1 : 0, createdAt);
   });
 
   tx();
@@ -203,28 +213,8 @@ export function updateProvider(
 
     db.prepare(
       `UPDATE providers SET
-      name = ?,
-      kind = ?,
-      endpoint_url = ?,
-      api_key = ?,
-      is_default = ?,
-      wol_enabled = ?,
-      wol_mac = ?,
-      wol_broadcast = ?,
-      wol_port = ?
-      WHERE id = ?`,
-    ).run(
-      input.name,
-      input.kind,
-      input.endpointUrl,
-      nextApiKey,
-      input.isDefault ? 1 : 0,
-      input.wolEnabled ? 1 : 0,
-      input.wolMac || null,
-      input.wolBroadcast || null,
-      input.wolPort || null,
-      id,
-    );
+       name = ?, kind = ?, endpoint_url = ?, api_key = ?, is_default = ?, created_at = ? WHERE id = ?`,
+    ).run(input.name, input.kind, input.endpointUrl, nextApiKey, input.isDefault ? 1 : 0, existing.createdAt, id);
   });
 
   tx();
@@ -266,10 +256,7 @@ export function createVirtualKey(name: string): {
     )
     .get(id);
 
-  return {
-    key: mapVirtualKey(row),
-    plaintext,
-  };
+  return { key: mapVirtualKey(row), plaintext };
 }
 
 export function updateVirtualKey(
@@ -321,10 +308,7 @@ export function rerollVirtualKey(
     )
     .get(id);
 
-  return {
-    key: mapVirtualKey(row),
-    plaintext,
-  };
+  return { key: mapVirtualKey(row), plaintext };
 }
 
 export function deleteVirtualKey(id: string): boolean {
@@ -354,10 +338,7 @@ export function authenticateVirtualKey(
   if (!row) return undefined;
 
   const now = new Date().toISOString();
-  db.prepare("UPDATE virtual_keys SET last_used_at = ? WHERE id = ?").run(
-    now,
-    row.id,
-  );
+  db.prepare("UPDATE virtual_keys SET last_used_at = ? WHERE id = ?").run(now, row.id);
   row.last_used_at = now;
 
   return mapVirtualKey(row);
@@ -376,19 +357,9 @@ export function logRequest(input: {
 }): void {
   db.prepare(
     `INSERT INTO request_logs (
-      id,
-      provider_id,
-      model,
-      status_code,
-      duration_ms,
-      virtual_key_id,
-      prompt_tokens,
-      completion_tokens,
-      total_tokens,
-      cost,
-      created_at
-    )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      id, provider_id, model, status_code, duration_ms, virtual_key_id,
+      prompt_tokens, completion_tokens, total_tokens, cost, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     randomUUID(),
     input.providerId || null,
@@ -407,65 +378,33 @@ export function logRequest(input: {
 export function getStats() {
   const summary = db
     .prepare(
-      `SELECT
-            COUNT(*) AS request_count,
-            COALESCE(SUM(total_tokens), 0) AS total_tokens,
-            SUM(cost) AS total_cost
-       FROM request_logs`,
+      `SELECT COUNT(*) AS request_count, COALESCE(SUM(total_tokens), 0) AS total_tokens, SUM(cost) AS total_cost FROM request_logs`,
     )
     .get();
 
   const providerUsage = db
     .prepare(
-      `SELECT p.id, p.name, COUNT(r.id) AS request_count
-     FROM providers p
-     LEFT JOIN request_logs r ON p.id = r.provider_id
-     GROUP BY p.id, p.name
-     ORDER BY request_count DESC, p.name ASC`,
+      `SELECT p.id, p.name, COUNT(r.id) AS request_count FROM providers p LEFT JOIN request_logs r ON p.id = r.provider_id GROUP BY p.id, p.name ORDER BY request_count DESC, p.name ASC`,
     )
     .all();
 
   const modelUsage = db
     .prepare(
-      `SELECT model, COUNT(*) AS request_count
-     FROM request_logs
-     GROUP BY model
-     ORDER BY request_count DESC, model ASC
-     LIMIT 20`,
+      `SELECT model, COUNT(*) AS request_count FROM request_logs GROUP BY model ORDER BY request_count DESC, model ASC LIMIT 20`,
     )
     .all();
 
   const requestsTimeline = db
     .prepare(
-      `SELECT (
-              strftime('%Y-%m-%dT%H:%M:00Z', created_at)
-            ) AS hour_bucket,
-            status_code,
-            COUNT(*) AS request_count
-     FROM request_logs
-     WHERE datetime(created_at) >= datetime('now', '-24 hours')
-     GROUP BY hour_bucket, status_code
-     ORDER BY hour_bucket ASC`,
+      `SELECT (strftime('%Y-%m-%dT%H:%M:00Z', created_at)) AS hour_bucket, status_code, COUNT(*) AS request_count FROM request_logs WHERE datetime(created_at) >= datetime('now', '-24 hours') GROUP BY hour_bucket, status_code ORDER BY hour_bucket ASC`,
     )
     .all();
 
   const recentRequests = db
     .prepare(
-      `SELECT r.created_at, r.status_code, r.model, r.duration_ms,
-      r.prompt_tokens, r.completion_tokens, r.total_tokens, r.cost,
-            COALESCE(p.name, 'Unauthenticated') AS provider_name
-     FROM request_logs r
-     LEFT JOIN providers p ON p.id = r.provider_id
-     ORDER BY r.created_at DESC
-     LIMIT 50`,
+      `SELECT r.created_at, r.status_code, r.model, r.duration_ms, r.prompt_tokens, r.completion_tokens, r.total_tokens, r.cost, r.virtual_key_id, COALESCE(vk.name, 'Unauthenticated') AS key_name, COALESCE(p.name, '—') AS provider_name FROM request_logs r LEFT JOIN providers p ON p.id = r.provider_id LEFT JOIN virtual_keys vk ON vk.id = r.virtual_key_id ORDER BY r.created_at DESC LIMIT 50`,
     )
     .all();
 
-  return {
-    summary,
-    providerUsage,
-    modelUsage,
-    requestsTimeline,
-    recentRequests,
-  };
+  return { summary, providerUsage, modelUsage, requestsTimeline, recentRequests };
 }

@@ -2,35 +2,18 @@
 export const DEFAULT_ENDPOINT = "https://api.openai.com";
 
 /** Supported provider kinds (API backends). */
-export type ProviderKind = "openai" | "anthropic" | "openrouter" | "other";
+export type ProviderKind = "openai" | "openrouter" | "openai-compatible";
 
 /** Default endpoint URLs per provider kind. Add new kinds here to get auto-fill on creation. */
 export const providerDefaults: Record<ProviderKind, { defaultEndpoint: string }> = {
-  openai: { defaultEndpoint: "https://api.openai.com" },
-  anthropic: { defaultEndpoint: "https://api.anthropic.com" },
+  openai: { defaultEndpoint: "https://api.openai.com/v1" },
   openrouter: { defaultEndpoint: "https://openrouter.ai/api/v1" },
-  other: { defaultEndpoint: "" },
+  "openai-compatible": { defaultEndpoint: "https://api.openai.com/v1" },
 };
 
 /** Returns the default endpoint URL for a given provider kind. */
 export function getDefaultEndpoint(kind: ProviderKind): string {
   return providerDefaults[kind]?.defaultEndpoint ?? "";
-}
-
-/** Cache metadata for a provider's model list. */
-export interface ProviderModelCache {
-  /** ISO timestamp when the cache was populated. */
-  cachedAt: string;
-  /** Age of the cache in milliseconds. */
-  cacheAgeMs: number;
-  /** Duration until the cache expires in milliseconds. */
-  expiresInMs: number;
-  /** Whether the cache has expired. */
-  expired: boolean;
-  /** Number of models in the cache. */
-  modelCount: number;
-  /** List of model identifiers. */
-  modelIds: string[];
 }
 
 /** Full provider record as stored and returned by the API. */
@@ -40,12 +23,6 @@ export interface Provider {
   kind: ProviderKind;
   endpointUrl: string;
   isDefault: boolean;
-  wolEnabled: boolean;
-  wolMac?: string;
-  wolBroadcast?: string;
-  wolPort?: number;
-  cacheEnabled: boolean;
-  modelCache: ProviderModelCache | null;
 }
 
 /** Form state for creating or editing a provider. */
@@ -55,10 +32,6 @@ export interface ProviderForm {
   endpointUrl: string;
   apiKey: string;
   isDefault: boolean;
-  wolEnabled: boolean;
-  wolMac: string;
-  wolBroadcast: string;
-  wolPort: number;
 }
 
 /** Returns a fresh, empty provider form object. */
@@ -69,9 +42,12 @@ export function createEmptyProviderForm(): ProviderForm {
     endpointUrl: getDefaultEndpoint("openai"),
     apiKey: "",
     isDefault: false,
-    wolEnabled: false,
-    wolMac: "",
-    wolBroadcast: "255.255.255.255",
-    wolPort: 9,
   };
 }
+
+/** Available kinds for provider selection. */
+export const PROVIDER_KINDS = [
+  { value: "openai" as ProviderKind, label: "OpenAI" },
+  { value: "openrouter" as ProviderKind, label: "OpenRouter" },
+  { value: "openai-compatible" as ProviderKind, label: "OpenAI Compatible (Anthropic, etc.)" },
+] as const;

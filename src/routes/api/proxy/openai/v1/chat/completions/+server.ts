@@ -8,61 +8,14 @@ import {
   logRequest,
 } from "$lib/server/db";
 import { extractBearer } from "$lib/server/keys";
-import { readCachedModels, writeCachedModels } from "$lib/server/models-cache";
-import { forwardChatCompletion, forwardModelList } from "$lib/server/proxy";
+import { forwardChatCompletion } from "$lib/server/proxy";
 import type { Provider } from "$lib/server/types";
-import { executeWithWolStartupGrace } from "$lib/server/wol-startup";
-import {
-  extractOpenAIUsageMetrics,
-  returnResponse,
-  buildProviderOrder,
-  authErrorResponse,
-  noProviderResponse,
-  providerNotFoundResponse,
-} from "$lib/server/common-server";
 import { startRequest, finishRequest } from "$lib/server/active-requests";
-
-async function getModelListForProvider(
-  provider: Provider,
-): Promise<string[]> {
-  const cached = readCachedModels(provider);
-  if (cached) {
-    return cached.models
-      .map((m) => m?.id)
-      .filter((id): id is string => typeof id === "string");
-  }
-
-  try {
-    const response = await forwardModelList(provider);
-    const payload = await response.json().catch(() => ({}));
-
-    const models = Array.isArray(payload?.data)
-      ? payload.data
-      : Array.isArray(payload)
-        ? payload
-        : [];
-    writeCachedModels(provider, models);
-
-    return models
-      .map((m: any) => m?.id)
-      .filter((id: unknown): id is string => typeof id === "string");
-  } catch {
-    return [];
-  }
-}
-
-async function providerHasModel(
-  provider: Provider,
-  modelId: string,
-): Promise<boolean> {
-  const models = await getModelListForProvider(provider);
-  return models.some((m) => m.toLowerCase() === modelId.toLowerCase());
-}
+import { extractOpenAIUsageMetrics } from "$lib/server/common-server";
 
 export const POST: RequestHandler = async ({ request }) => {
   const startedAt = Date.now();
   const body = await request.json().catch(() => ({}));
-  const streamRequested = body?.stream === true;
 
   const bearer = extractBearer(request.headers.get("authorization"));
   if (!bearer) {
@@ -71,7 +24,7 @@ export const POST: RequestHandler = async ({ request }) => {
       statusCode: 401,
       durationMs: Date.now() - startedAt,
     });
-    return authErrorResponse("missing");
+    return json({ error: "Missing virtual key in Authorization header" }, { status: 401 });
   }
 
   const virtualKey = authenticateVirtualKey(bearer);
@@ -81,95 +34,76 @@ export const POST: RequestHandler = async ({ request }) => {
       statusCode: 401,
       durationMs: Date.now() - startedAt,
     });
-    return authErrorResponse("invalid");
+    return json({ error: "Invalid virtual key" }, { status: 401 });
   }
-
-  const providerId =
-    request.headers.get("x-provider-id") ||
-    body?.providerId ||
-    request.headers.get("x-ai-provider-id") ||
-    undefined;
 
   const allProviders = listProviders();
   if (allProviders.length === 0) {
-    return noProviderResponse();
+    return json({ error: "No provider configured. Add a provider in the UI first." }, { status: 400 });
   }
 
   const model = body?.model || "unknown-model";
 
-  // Resolve provider name for tracking
+  function resolveProviderId(req: any): string | undefined {
+    return (
+      req.headers.get("x-provider-id") ||
+      req.headers.get("x-ai-provider-id") ||
+      body.providerId ||
+      undefined
+    );
+  }
+
   let providerName: string | undefined;
-  if (providerId) {
-    const p = getProvider(providerId);
+  if (body.providerId) {
+    const p = getProvider(body.providerId);
     if (!p) {
-      return providerNotFoundResponse();
+      return json({ error: "Provider not found" }, { status: 404 });
     }
     providerName = p.name;
+  } else {
+    const defaultProvider = getDefaultProvider();
+    if (defaultProvider) {
+      providerName = defaultProvider.name;
+    }
   }
 
   // Register as an active request
-  const runId = startRequest({ model, providerId, providerName });
+  const runId = startRequest({ model, providerId: body.providerId || undefined, providerName, virtualKey: virtualKey.name });
 
   try {
-    return await handleAuthenticatedRequest({
-      startedAt,
-      body,
-      streamRequested,
-      providerId,
-      allProviders,
-      model,
-      virtualKey,
-      providerName,
-    });
+    return await handleAuthenticatedRequest({ startedAt, body, allProviders, model, virtualKey,       providerId: resolveProviderId(request) });
   } finally {
     finishRequest(runId);
   }
 };
 
-/** Core request logic — called after the request is registered as active. */
 async function handleAuthenticatedRequest(params: {
   startedAt: number;
   body: any;
-  streamRequested: boolean;
-  providerId: string | undefined;
   allProviders: ReturnType<typeof listProviders>;
   model: string;
   virtualKey: NonNullable<ReturnType<typeof authenticateVirtualKey>>;
-  providerName: string | undefined;
+  providerId?: string | null;
 }) {
-  const { startedAt, body, streamRequested, providerId, allProviders, model, virtualKey } = params;
+  const { startedAt, body, allProviders, model, virtualKey } = params;
 
   console.log(
-    `[ai-proxy] /completions request - model: "${model}", requested providerId: ${providerId || "none"}`,
+    `[ai-proxy] /chat/completions request - model: "${model}"`,
   );
 
-  if (providerId) {
-    const explicitProvider = getProvider(providerId)!;
+  if (params.providerId) {
+    const explicitProvider = getProvider(params.providerId);
+    if (!explicitProvider) {
+      return json({ error: "Provider not found" }, { status: 404 });
+    }
 
     console.log(
       `[ai-proxy] Using explicitly requested provider: "${explicitProvider.name}" (id: ${explicitProvider.id})`,
     );
 
-    if (streamRequested && explicitProvider.kind === "anthropic") {
-      return json(
-        {
-          error:
-            "Streaming is not yet supported for Anthropic providers in this proxy.",
-        },
-        { status: 400 },
-      );
-    }
-
     let upstream: Response;
     try {
-      upstream = await executeWithWolStartupGrace(
-        explicitProvider,
-        "chat:completion",
-        () => forwardChatCompletion(explicitProvider, body),
-        {
-          shouldRetryResult: (response) => response.status >= 500,
-        },
-      );
+      upstream = await forwardChatCompletion(explicitProvider, body);
     } catch (error: any) {
       const statusCode = 502;
       logRequest({
@@ -193,18 +127,10 @@ async function handleAuthenticatedRequest(params: {
       );
     }
 
-    return returnResponse(
-      upstream,
-      model,
-      explicitProvider.id,
-      streamRequested,
-      virtualKey.id,
-      startedAt,
-      extractOpenAIUsageMetrics,
-    );
+    return await processResponse(upstream, model, explicitProvider.id, body.stream === true, virtualKey.id, startedAt);
   }
 
-  const providersToTry = buildProviderOrder(allProviders);
+  const providersToTry = allProviders;
   console.log(
     `[ai-proxy] Provider attempt order: ${providersToTry.map(p => `"${p.name}" (id: ${p.id})`).join(", ")}`,
   );
@@ -213,58 +139,69 @@ async function handleAuthenticatedRequest(params: {
   let lastError: Error | undefined;
 
   for (const candidate of providersToTry) {
-    if (streamRequested && candidate.kind === "anthropic") {
-      console.log(
-        `[ai-proxy] Skipping provider "${candidate.name}" - streaming not supported for Anthropic`,
-      );
-      continue;
-    }
-
     console.log(
       `[ai-proxy] Checking if provider "${candidate.name}" (id: ${candidate.id}) has model "${model}"...`,
     );
-    const hasModel = await providerHasModel(candidate, model);
-
-    if (!hasModel) {
-      console.log(
-        `[ai-proxy] Provider "${candidate.name}" does not have model "${model}" - skipping`,
-      );
-      continue;
-    }
-
-    triedProviders.push(candidate);
-    console.log(
-      `[ai-proxy] Provider "${candidate.name}" has model "${model}" - sending chat completion request`,
-    );
 
     try {
-      const upstream = await executeWithWolStartupGrace(
-        candidate,
-        "chat:completion",
-        () => forwardChatCompletion(candidate, body),
-        {
-          shouldRetryResult: (response) => response.status >= 500,
-        },
-      );
+      const upstream = await forwardChatCompletion(candidate, body);
 
-      const upstreamText = await upstream.text();
-      const upstreamContentType =
-        upstream.headers.get("content-type") || "";
-      const isEventStream = upstreamContentType.toLowerCase().includes(
-        "text/event-stream",
-      );
+      if (!upstream.ok) {
+        lastError = new Error(`Upstream ${upstream.status} from "${candidate.name}"`);
+        logRequest({
+          providerId: candidate.id,
+          model,
+          statusCode: upstream.status,
+          durationMs: Date.now() - startedAt,
+          virtualKeyId: virtualKey.id,
+        });
 
-      console.log(
-        `[ai-proxy] Provider "${candidate.name}" returned status ${upstream.status}${isEventStream ? " (streaming)" : ""}`,
-      );
+        console.log(
+          `[ai-proxy] Provider "${candidate.name}" returned ${upstream.status}: ${typeof (await upstream.json()).then((j: any) => j?.error || {}).catch(() => "unknown")}`,
+        );
+
+        continue;
+      }
+
+      const statusCode = upstream.status;
+      const isEventStream = (upstream.headers.get("content-type") || "").toLowerCase().includes("text/event-stream");
+
+      if (isEventStream) {
+        const responseText = await upstream.text();
+        const usage = await aggregateStreamUsage(responseText);
+
+        logRequest({
+          providerId: candidate.id,
+          model,
+          statusCode: upstream.status,
+          durationMs: Date.now() - startedAt,
+          virtualKeyId: virtualKey.id,
+          promptTokens: usage.promptTokens || undefined,
+          completionTokens: usage.completionTokens || undefined,
+          totalTokens: usage.totalTokens || undefined,
+        });
+
+        return new Response(responseText, {
+          status: upstream.status,
+          headers: { "content-type": upstream.headers.get("content-type") || "" },
+        });
+      }
+
+      let textContent;
+      try {
+        textContent = await upstream.text();
+      } catch (e: any) {
+        console.log(
+          `[ai-proxy] Could not read response from "${candidate.name}": ${(e as Error)?.message || "Unknown error"}`,
+        );
+        continue;
+      }
 
       const metrics: ReturnType<typeof extractOpenAIUsageMetrics> = {};
       try {
-        const payload = JSON.parse(upstreamText);
+        const payload = JSON.parse(textContent);
         Object.assign(metrics, extractOpenAIUsageMetrics(payload));
-      } catch {
-        // ignore parse errors
-      }
+      } catch { /* ignore parse errors */ }
 
       logRequest({
         providerId: candidate.id,
@@ -275,12 +212,9 @@ async function handleAuthenticatedRequest(params: {
         ...metrics,
       });
 
-      return new Response(upstreamText, {
+      return new Response(textContent, {
         status: upstream.status,
-        headers: {
-          "content-type":
-            upstream.headers.get("content-type") || "application/json",
-        },
+        headers: { "content-type": upstream.headers.get("content-type") || "application/json" },
       });
     } catch (error: any) {
       lastError = error;
@@ -297,13 +231,75 @@ async function handleAuthenticatedRequest(params: {
     {
       error: `Failed to complete request. Model '${model}' not available in any configured provider.`,
       detail: lastError?.message || "Unknown proxy error",
-      triedProviders: triedProviders.map((p) => ({
-        providerId: p.id,
-        providerName: p.name,
-      })),
+      triedProviders: triedProviders.map((p) => ({ providerId: p.id, providerName: p.name })),
     },
     { status: 502 },
   );
+}
+
+async function aggregateStreamUsage(responseText: string): Promise<{ promptTokens: number; completionTokens: number; totalTokens: number }> {
+  const lines = responseText.split("\n").filter(l => l.startsWith("data:"));
+
+  let promptTokens = 0, completionTokens = 0, totalTokens = 0;
+
+  for (const line of lines) {
+    const data = line.slice(5).trim();
+    if (data === "[DONE]") continue;
+
+    try {
+      const chunk = JSON.parse(data);
+      const usage = chunk?.usage || {};
+      if (usage?.prompt_tokens != null) promptTokens += Number(usage.prompt_tokens);
+      if (usage?.completion_tokens != null) completionTokens += Number(usage.completion_tokens);
+      if (usage?.total_tokens != null) totalTokens += Number(usage.total_tokens);
+    } catch { /* ignore malformed chunks */ }
+  }
+
+  return { promptTokens, completionTokens, totalTokens };
+}
+
+async function processResponse(
+  upstream: Response,
+  model: string,
+  providerId: string,
+  streamRequested: boolean,
+  virtualKeyId: string,
+  startedAt: number,
+): Promise<Response> {
+  const statusCode = upstream.status;
+  const isEventStream = (upstream.headers.get("content-type") || "").toLowerCase().includes("text/event-stream");
+
+  if (streamRequested && isEventStream) {
+    const responseText = await upstream.text();
+    const usage = await aggregateStreamUsage(responseText);
+
+    logRequest({
+      providerId, model, statusCode, durationMs: Date.now() - startedAt, virtualKeyId,
+      promptTokens: usage.promptTokens || undefined,
+      completionTokens: usage.completionTokens || undefined,
+      totalTokens: usage.totalTokens || undefined,
+    });
+
+    return new Response(responseText, {
+      status: statusCode,
+      headers: {
+        "content-type": upstream.headers.get("content-type") || "",
+        "cache-control": upstream.headers.get("cache-control") || "no-cache",
+        connection: upstream.headers.get("connection") || "keep-alive",
+      },
+    });
+  }
+
+  const textContent = await upstream.text();
+  let metrics: ReturnType<typeof extractOpenAIUsageMetrics> = {};
+  try {
+    const payload = JSON.parse(textContent);
+    Object.assign(metrics, extractOpenAIUsageMetrics(payload));
+  } catch { /* ignore */ }
+
+  logRequest({ providerId, model, statusCode, durationMs: Date.now() - startedAt, virtualKeyId, ...metrics });
+
+  return new Response(textContent, { status: statusCode, headers: { "content-type": upstream.headers.get("content-type") || "application/json" } });
 }
 
 

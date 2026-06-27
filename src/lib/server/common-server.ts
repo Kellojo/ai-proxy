@@ -88,32 +88,6 @@ export function extractOpenAIUsageMetrics(payload: any): UsageMetrics {
   return { promptTokens, completionTokens, totalTokens, cost };
 }
 
-export function extractAnthropicUsageMetrics(payload: any): UsageMetrics {
-  const usage = payload?.usage || {};
-
-  const promptTokens =
-    readNumericValue(usage?.input_tokens) ??
-    readNumericValue(usage?.cache_creation_input_tokens) ??
-    readNumericValue(usage?.cache_read_input_tokens);
-
-  const completionTokens = readNumericValue(usage?.output_tokens);
-
-  const totalTokens =
-    readNumericValue(usage?.input_tokens) ??
-    (() => {
-      const combined = (promptTokens ?? 0) + (completionTokens ?? 0);
-      return combined > 0 ? combined : undefined;
-    })();
-
-  const cost =
-    readNumericValue(usage?.cost) ??
-    readNumericValue(usage?.total_cost) ??
-    readNumericValue(payload?.cost) ??
-    readNumericValue(payload?.total_cost);
-
-  return { promptTokens, completionTokens, totalTokens, cost };
-}
-
 // ── Response handling ────────────────────────────────────────────────────
 
 export function returnResponse(

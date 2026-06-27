@@ -1,4 +1,4 @@
-export type ProviderKind = "openai" | "anthropic" | "other";
+export type ProviderKind = "openai";
 
 export interface Provider {
   id: string;
@@ -7,10 +7,6 @@ export interface Provider {
   endpointUrl: string;
   apiKey: string;
   isDefault: boolean;
-  wolEnabled: boolean;
-  wolMac?: string;
-  wolBroadcast?: string;
-  wolPort?: number;
   createdAt: string;
 }
 
@@ -20,10 +16,6 @@ export interface ProviderInput {
   endpointUrl: string;
   apiKey?: string;
   isDefault?: boolean;
-  wolEnabled?: boolean;
-  wolMac?: string;
-  wolBroadcast?: string;
-  wolPort?: number;
 }
 
 export interface VirtualKey {

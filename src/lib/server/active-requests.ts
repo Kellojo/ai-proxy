@@ -6,6 +6,7 @@ export interface ActiveRequest {
   model: string;
   providerId: string | undefined;
   providerName: string | undefined;
+  virtualKey: string | undefined;
   startedAt: number; // Date.now()
 }
 
@@ -20,6 +21,7 @@ export function startRequest(entry: Omit<ActiveRequest, "id" | "startedAt">): st
     model: entry.model,
     providerId: entry.providerId,
     providerName: entry.providerName,
+    virtualKey: entry.virtualKey,
     startedAt: Date.now(),
   });
   return id;

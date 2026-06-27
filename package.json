@@ -12,8 +12,7 @@
     "preview": "vite preview",
     "start": "node build",
     "check": "svelte-kit sync && tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run"
   },
   "engines": {
     "node": ">=20"
@@ -23,14 +22,12 @@
     "@sveltejs/kit": "^2.65.0",
     "better-sqlite3": "^12.10.1",
     "chart.js": "^4.5.1",
-    "svelte": "^5.56.0",
-    "wake_on_lan": "^1.0.0"
+    "svelte": "^5.56.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^25.9.3",
     "typescript": "^6.0.3",
-    "vite": "^8.0.16",
-    "vitest": "^4.1.9"
+    "vite": "^8.0.16"
   }
 }

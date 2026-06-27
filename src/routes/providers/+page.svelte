@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { loadProviders } from "./providers-store";
   import { onMount } from "svelte";
-  import { setupAutoRefresh, removeProvider, clearModelCache } from "./providers-store";
+
+  import { removeProvider } from "./providers-store";
   import type { Provider } from "./types";
 
   import CacheNotice from "./components/CacheNotice.svelte";
@@ -8,13 +10,12 @@
   import EditProviderModal from "./components/EditProviderModal.svelte";
   import ProviderTable from "./components/ProviderTable.svelte";
 
-  let cleanupAutoRefresh: (() => void) | null = null;
   let showCreateModal = false;
   let showEditModal = false;
   let editingProvider: Provider = {} as Provider;
 
   onMount(() => {
-    cleanupAutoRefresh = setupAutoRefresh();
+    loadProviders();
   });
 
   function handleCreateProvider() {
@@ -38,10 +39,6 @@
   function handleDeleteProvider(id: string) {
     removeProvider(id);
   }
-
-  function handleClearCache() {
-    clearModelCache();
-  }
 </script>
 
 <main>
@@ -49,7 +46,6 @@
     onCreateProvider={handleCreateProvider}
     onEditProvider={handleEditProvider}
     onDeleteProvider={handleDeleteProvider}
-    onClearCache={handleClearCache}
   />
 
   <CacheNotice />

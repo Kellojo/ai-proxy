@@ -23,10 +23,6 @@
       endpointUrl: provider.endpointUrl,
       apiKey: "",
       isDefault: provider.isDefault,
-      wolEnabled: provider.wolEnabled,
-      wolMac: provider.wolMac || "",
-      wolBroadcast: provider.wolBroadcast || "255.255.255.255",
-      wolPort: provider.wolPort || 9,
     };
   }
 
