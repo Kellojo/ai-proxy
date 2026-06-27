@@ -324,6 +324,21 @@ async function forwardRequest(
     body: bodyStr,
   });
 
+  const upstreamContentType = response.headers.get("content-type") || "";
+  const isEventStream = upstreamContentType.toLowerCase().includes("text/event-stream");
+
+  // Pass SSE streams through directly — they are not valid JSON and must not be parsed
+  if (isEventStream) {
+    return new Response(response.body, {
+      status: response.status,
+      headers: {
+        "content-type": upstreamContentType,
+        "cache-control": response.headers.get("cache-control") || "no-cache",
+        connection: response.headers.get("connection") || "keep-alive",
+      },
+    });
+  }
+
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
