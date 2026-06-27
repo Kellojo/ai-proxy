@@ -542,26 +542,12 @@ a:hover {
 .table-wrap {
   width: 100%;
   overflow: auto;
-  border: 1px solid var(--borderColor);
-  border-radius: 1rem;
-  background-color: var(--backgroundLight);
-  -webkit-backdrop-filter: blur(2rem);
-  backdrop-filter: blur(2rem);
-  padding: 1rem;
-  box-shadow: var(--shadow-s);
-  cursor: default;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  transition: border-color 0.1s ease-out;
 }
 
 .logs-table {
   width: 100%;
   min-width: 700px;
   border-collapse: collapse;
-  background-color: var(--backgroundLight);
 }
 
 .logs-table th,
@@ -575,9 +561,6 @@ a:hover {
 .logs-table th {
   color: var(--muted);
   font-weight: 600;
-  background-color: var(--backgroundLight);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
 }
 
 .logs-table tbody tr:hover {
@@ -743,6 +726,26 @@ a:hover {
   background: color-mix(in srgb, var(--info) 16%, transparent);
 }
 
+.running-spinner {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 0.35rem;
+  flex-shrink: 0;
+  vertical-align: middle;
+  border: 1.5px solid transparent;
+  border-top-color: var(--info);
+  border-right-color: color-mix(in srgb, var(--info) 60%, transparent);
+  animation: running-spin 0.4s linear infinite;
+}
+
+@keyframes running-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .running-dot {
   width: 7px;
   height: 7px;
@@ -750,11 +753,7 @@ a:hover {
   display: inline-block;
   margin-right: 0.35rem;
   flex-shrink: 0;
-  background-image: linear-gradient(
-    135deg,
-    var(--infoSecondary),
-    var(--info)
-  );
+  background-image: linear-gradient(135deg, var(--infoSecondary), var(--info));
   animation: running-pulse 1.4s ease-in-out infinite alternate;
 }
 
@@ -804,11 +803,45 @@ a:hover {
   display: inline-block;
   margin-right: 0.35rem;
   flex-shrink: 0;
-  background-image: linear-gradient(
-    135deg,
-    var(--infoSecondary),
-    var(--info)
-  );
+  background-image: linear-gradient(135deg, var(--infoSecondary), var(--info));
+}
+
+.running-row {
+  font-variant-numeric: tabular-nums;
+}
+
+.running-latency {
+  color: var(--info);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  display: inline-block;
+  animation: latency-breathe 2.4s ease-in-out infinite;
+}
+
+@keyframes running-bubble-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 6px -1px rgba(var(--info-rgb, 89 130 247), 0.2);
+  }
+  50% {
+    box-shadow:
+      0 0 12px 1px rgba(var(--info-rgb, 89 130 247), 0.4),
+      0 0 24px -2px rgba(var(--info-rgb, 89 130 247), 0.25);
+  }
+}
+
+.status-pill.running {
+  animation: running-bubble-glow 2s ease-in-out infinite;
+}
+
+@keyframes latency-breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
 }
 
 .cell-stack {
@@ -825,13 +858,6 @@ a:hover {
 }
 
 .chart-panel {
-  border: 1px solid var(--borderColor);
-  border-radius: 1rem;
-  background-color: var(--backgroundLight);
-  -webkit-backdrop-filter: blur(2rem);
-  backdrop-filter: blur(2rem);
-  padding: 0.75rem;
-  box-shadow: var(--shadow-s);
   position: relative;
   min-height: 280px;
 }
@@ -870,6 +896,76 @@ a:hover {
   margin-top: 0.28rem;
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+.tab-group {
+  display: flex;
+  gap: 0.35rem;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 1rem;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: all 120ms ease-out;
+  border-radius: 0.4rem 0.4rem 0 0;
+}
+
+.tab-btn:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--paper) 50%, transparent);
+}
+
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.code-block {
+  position: relative;
+  background: var(--backgroundLight);
+  border: 1px solid var(--borderColor);
+  border-radius: 0.75rem;
+  overflow: hidden;
+}
+
+.copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 60%, var(--glass-border));
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  transition: all 120ms ease-out;
+}
+
+.copy-btn:hover {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+pre {
+  margin: 0;
+  padding: 1rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: var(--primaryText);
 }
 
 @media (max-width: 640px) {

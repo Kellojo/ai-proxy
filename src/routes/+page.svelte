@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
   import {
-    formatTime,
     statusTone,
     displayModelName,
     formatCompact,
@@ -140,7 +139,7 @@
     const labels = points.map((row) => row.label);
     const textMuted = readCssVar("--secondaryText", "#9ca3af");
     const textPrimary = readCssVar("--primaryText", "#f3f4f6");
-    const gridColor = readCssVar("--borderColor", "rgba(255,255,255,0.1)");
+    const gridColor = readCssVar("--line", "rgba(255,255,255,0.1)");
     const success = readCssVar("--success", "#6dd67f");
     const warning = readCssVar("--warning", "#f5b342");
     const error = readCssVar("--error", "#ef6b6b");
@@ -220,7 +219,7 @@
               maxTicksLimit: 10,
             },
             grid: {
-              color: `${gridColor}66`,
+              color: gridColor,
             },
           },
           y: {
@@ -231,7 +230,7 @@
               precision: 0,
             },
             grid: {
-              color: `${gridColor}66`,
+              color: gridColor,
             },
           },
         },
@@ -341,26 +340,24 @@
       </section>
     {/if}
 
-    <section class="card span-12 stack">
+    <div class="span-12" style="display:flex;flex-direction:column;gap:1rem">
       <h2>Request Trends</h2>
 
       {#if !chartRows().length}
         <p class="muted">No timeline data yet.</p>
       {:else}
-        <div class="chart-panel">
+        <div class="chart-panel card">
           <canvas bind:this={timelineCanvas} class="timeline-chart"></canvas>
         </div>
       {/if}
-    </section>
+    </div>
 
-    <section class="card span-12 stack">
+    <div class="span-12" style="display:flex;flex-direction:column;gap:1rem">
       <h2>Request Logs</h2>
-      <p class="muted">Latest request history with status and latency.</p>
-
       {#if !stats?.recentRequests?.length && !stats?.activeRequests?.length}
         <p class="muted">No request logs yet.</p>
       {:else}
-        <div class="table-wrap">
+        <div class="table-wrap card">
           <table class="logs-table">
             <thead>
               <tr>
@@ -374,10 +371,10 @@
             <tbody>
               {#each stats.activeRequests as active}
                 <tr class="running-row">
-                  <td>
+                  <td class="active-cell">
                     <div class="cell-stack">
                       <div>{active.virtualKey || "—"}</div>
-                      <div class="muted">{formatTimeAgo(active.startedAt)}</div>
+                      <div class="muted">now</div>
                     </div>
                   </td>
                   <td>
@@ -386,10 +383,10 @@
                       <div class="muted">{displayModelName(active.model)}</div>
                     </div>
                   </td>
-                  <td>
+                  <td style="width: 120px;">
                     <div class="cell-stack">
                       <span class="status-pill running">
-                        <span class="running-dot"></span>
+                        <span class="running-spinner"></span>
                         Running
                       </span>
                       <div></div>
@@ -397,13 +394,17 @@
                   </td>
                   <td>
                     <div class="cell-stack">
-                      <div>{formatLatency(Date.now() - active.startedAt)}</div>
+                      <div>
+                        <span class="running-latency"
+                          >{formatLatency(Date.now() - active.startedAt)}</span
+                        >
+                      </div>
                       <div class="muted"></div>
                     </div>
                   </td>
-                  <td>
+                  <td style="width:120px">
                     <div class="cell-stack">
-                      <div>—</div>
+                      <div>— <span class="muted">tokens</span></div>
                       <div class="muted">—</div>
                     </div>
                   </td>
@@ -425,7 +426,9 @@
                   </td>
                   <td>
                     <div class="cell-stack">
-                      <span class={`status-pill ${statusTone(row.status_code)}`}>
+                      <span
+                        class={`status-pill ${statusTone(row.status_code)}`}
+                      >
                         {row.status_code}
                       </span>
                       <div></div>
@@ -437,9 +440,9 @@
                       <div class="muted"></div>
                     </div>
                   </td>
-                  <td>
+                  <td style="width:120px">
                     <div class="cell-stack">
-                      <div>{formatTokens(row.total_tokens)}</div>
+                      <div>{formatTokens(row.total_tokens)} <span class="muted">tokens</span></div>
                       <div class="muted">{formatCost(row.cost)}</div>
                     </div>
                   </td>
@@ -449,6 +452,6 @@
           </table>
         </div>
       {/if}
-    </section>
+    </div>
   </div>
 </main>

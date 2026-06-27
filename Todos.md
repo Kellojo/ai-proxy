@@ -8,7 +8,6 @@
 
 - Add a model remapping page, that allows remapping model names like "auto", "app 2" -> vibethinker-3b, ... Should be a simple ui, allowing me to view all in one place and update them quickly. Also ensure this is used in the app itself, when loading models.
 
-- In the logs table, show which key is performing the action and regroup it a bit to be more readable
 - For the API Docs rename it to get started section
 - Add copy/paste configs for Opencode, Claude Code, API in a tab menu style 
 

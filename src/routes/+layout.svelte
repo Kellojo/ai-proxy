@@ -24,7 +24,7 @@
       <a href="/virtual-keys" class:active={isActive("/virtual-keys")}
         >Virtual Keys</a
       >
-      <a href="/docs" class:active={isActive("/docs")}>API Docs</a>
+      <a href="/docs" class:active={isActive("/docs")}>Get Started</a>
     </nav>
   </div>
 </header>
