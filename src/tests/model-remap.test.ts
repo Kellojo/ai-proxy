@@ -198,7 +198,7 @@ describe("Model Remapping", () => {
       await new Promise((r) => setTimeout(r, 50));
 
       const statsRes = await request("/api/stats");
-      const remappedRow = (statsRes.body as any).recentRequests?.find(
+      const remappedRow = (statsRes.body as any).requests?.find(
         (row: any) => row.remapped_model === "claude-opus-4-20250514",
       );
       expect(remappedRow).toBeDefined();
@@ -226,7 +226,7 @@ describe("Model Remapping", () => {
       await new Promise((r) => setTimeout(r, 50));
 
       const statsRes = await request("/api/stats");
-      const unmappedRow = (statsRes.body as any).recentRequests?.find(
+      const unmappedRow = (statsRes.body as any).requests?.find(
         (row: any) => row.model === "nonsense-model-xyz",
       );
       expect(unmappedRow).toBeDefined();
@@ -256,7 +256,7 @@ describe("Model Remapping", () => {
       await new Promise((r) => setTimeout(r, 50));
 
       const statsRes = await request("/api/stats");
-      const remappedRow = (statsRes.body as any).recentRequests?.find(
+      const remappedRow = (statsRes.body as any).requests?.find(
         (row: any) => row.remapped_model === "claude-opus-4-20250514",
       );
       expect(remappedRow).toBeDefined();
@@ -284,7 +284,7 @@ describe("Model Remapping", () => {
       await new Promise((r) => setTimeout(r, 50));
 
       const statsRes = await request("/api/stats");
-      const remappedRow = (statsRes.body as any).recentRequests?.find(
+      const remappedRow = (statsRes.body as any).requests?.find(
         (row: any) => row.remapped_model === "target-v1",
       );
       expect(remappedRow).toBeDefined();

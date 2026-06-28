@@ -43,3 +43,19 @@ export interface RequestLog {
   remappedModel?: string;
   createdAt: string;
 }
+
+export interface RequestRow {
+  id: string;
+  created_at: string;
+  status_code: number;
+  model: string;
+  duration_ms: number;
+  prompt_tokens: number | null;
+  completion_tokens: number | null;
+  total_tokens: number | null;
+  cost: number | null;
+  remapped_model: string | null;
+  virtual_key_id: string | null;
+  key_name: string;
+  provider_name: string;
+}

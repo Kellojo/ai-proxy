@@ -83,7 +83,8 @@ export function extractOpenAIUsageMetrics(payload: any): UsageMetrics {
     readNumericValue(usage?.cost) ??
     readNumericValue(usage?.total_cost) ??
     readNumericValue(payload?.cost) ??
-    readNumericValue(payload?.total_cost);
+    readNumericValue(payload?.total_cost) ??
+    readNumericValue(usage?.cost_details?.upstream_inference_cost);
 
   return { promptTokens, completionTokens, totalTokens, cost };
 }

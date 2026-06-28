@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+  import { fade } from "svelte/transition";
 
   import Tag from "$lib/svelte-components/Tag.svelte";
 
@@ -23,8 +24,6 @@
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
   let chartTimer: ReturnType<typeof setInterval> | null = null;
   let loadingStats = false;
-  let prevRequestIds = new Set<string>();
-  let prevActiveKeys = new Set<string>();
 
   const LIVE_REFRESH_MS = 1000;
   const MAX_BUCKETS = 50;
@@ -119,13 +118,6 @@
 
   function activeModels() {
     return stats?.modelUsage?.length || 0;
-  }
-
-  function activeKey(active: any) {
-    const provider = (active.providerName ?? "").toLowerCase();
-    const model = (active.model ?? "").toLowerCase();
-    const started = String(active.startedAt ?? "");
-    return `${provider}::${model}::${started}`;
   }
 
   async function ensureChartLib() {
@@ -258,32 +250,12 @@
       const statsRes = await fetch("/api/stats");
       if (!statsRes.ok) return;
 
-      const newStats = await statsRes.json();
-      const currentIds = new Set<string>();
-      for (const row of newStats.recentRequests ?? []) {
-        if (row.id) currentIds.add(row.id);
-      }
-      const newlyAdded = new Set<string>();
-      for (const id of currentIds) {
-        if (!prevRequestIds.has(id)) newlyAdded.add(id);
-      }
-      prevRequestIds = currentIds;
-
-      stats = newStats;
+      stats = await statsRes.json();
       await tick();
       await renderTimelineChart();
-
-      // Remove the "new" highlight once the animation has finished.
-      setTimeout(() => {
-        for (const id of newlyAdded) prevRequestIds.add(id + "_done");
-      }, 400);
     } finally {
       loadingStats = false;
     }
-  }
-
-  function isNewRow(id: string): boolean {
-    return !prevRequestIds.has(id) && !prevRequestIds.has(id + "_done");
   }
 
   function startTimers() {
@@ -386,7 +358,7 @@
 
     <div class="span-12" style="display:flex;flex-direction:column;gap:1rem">
       <h2>Request Logs</h2>
-      {#if !stats?.recentRequests?.length && !stats?.activeRequests?.length}
+      {#if !stats?.requests?.length}
         <p class="muted">No request logs yet.</p>
       {:else}
         <div class="table-wrap card">
@@ -401,83 +373,77 @@
               </tr>
             </thead>
             <tbody>
-              {#each stats.activeRequests as active (activeKey(active))}
-                <tr class="running-row" data-new={isNewRow(String(active.startedAt + active.providerName + active.model))}>
-                  <td class="active-cell">
-                    <div class="cell-stack">
-                      <div>{active.virtualKey || "—"}</div>
-                      <div class="muted">now</div>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="cell-stack">
-                      <div>{active.providerName || "—"}</div>
-                      <div class="muted">{displayModelName(active.model)}</div>
-                    </div>
-                  </td>
-                  <td style="width: 120px;">
-                    <div class="cell-stack">
-                      <Tag variant="running">
-                        <span class="running-spinner"></span>
-                        Running
-                      </Tag>
-                      <div></div>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="cell-stack">
-                      <div>
-                        <span class="running-latency"
-                          >{formatLatency(Date.now() - active.startedAt)}</span
-                        >
-                      </div>
-                      <div class="muted"></div>
-                    </div>
-                  </td>
-                  <td style="width:160px">
-                    <div class="cell-stack">
-                      <div>— <span class="muted">tokens</span></div>
-                      <div class="muted">—</div>
-                    </div>
-                  </td>
-                </tr>
-              {/each}
-              {#each stats.recentRequests as row (row.id)}
-                <tr data-new={isNewRow(row.id)}>
-                  <td>
+              {#each stats.requests as row (row.id)}
+                <tr class:running-row={row.status_code === 0}>
+                  <td class:active-cell={row.status_code === 0}>
                     <div class="cell-stack">
                       <div>{row.key_name}</div>
-                      <div class="muted">{formatTimeAgo(row.created_at)}</div>
-                    </div>
-                  </td>
-                  <td>
-                    <div class="cell-stack">
-                      <div>{row.provider_name}</div>
-                      {#if row.remapped_model && row.remapped_model !== row.model}
-                        <span style="font-size:.85rem;white-space:nowrap" class="muted">{displayModelName(row.model)} &gt; {displayModelName(row.remapped_model)}</span>
+                      {#if row.status_code === 0}
+                        <div class="muted">now</div>
                       {:else}
-                        <div class="muted">{displayModelName(row.model)}</div>
+                        <div class="muted">{formatTimeAgo(row.created_at)}</div>
                       {/if}
                     </div>
                   </td>
                   <td>
                     <div class="cell-stack">
-                      <Tag variant={statusTone(row.status_code)}>
-                        {row.status_code}
-                      </Tag>
+                      <div>{row.provider_name}</div>
+                      {#if row.status_code === 0}
+                        <div class="muted">{displayModelName(row.model)}</div>
+                      {:else if row.remapped_model && row.remapped_model !== row.model}
+                        <span
+                          style="font-size:.85rem;white-space:nowrap"
+                          class="muted"
+                          >{displayModelName(row.model)} &gt; {displayModelName(
+                            row.remapped_model,
+                          )}</span
+                        >
+                      {:else}
+                        <div class="muted">{displayModelName(row.model)}</div>
+                      {/if}
+                    </div>
+                  </td>
+                  <td style="width: 120px;">
+                    <div class="cell-stack">
+                      {#if row.status_code === 0}
+                        <Tag variant="running">
+                          <span class="running-spinner"></span>
+                          Running
+                        </Tag>
+                      {:else}
+                        <Tag variant={statusTone(row.status_code)}>
+                          {row.status_code}
+                        </Tag>
+                      {/if}
                       <div></div>
                     </div>
                   </td>
                   <td>
                     <div class="cell-stack">
-                      <div>{formatLatency(row.duration_ms)}</div>
+                      {#if row.status_code === 0}
+                        <span class="running-latency"
+                          >{formatLatency(
+                            Date.now() - new Date(row.created_at).getTime(),
+                          )}</span
+                        >
+                      {:else}
+                        {formatLatency(row.duration_ms)}
+                      {/if}
                       <div class="muted"></div>
                     </div>
                   </td>
                   <td style="width:160px">
                     <div class="cell-stack">
-                      <div>{formatTokens(row.total_tokens)} <span class="muted">tokens</span></div>
-                      <div class="muted">{formatCost(row.cost)}</div>
+                      {#if row.status_code === 0}
+                        <div>— <span class="muted">tokens</span></div>
+                        <div class="muted">—</div>
+                      {:else}
+                        <div>
+                          {formatTokens(row.total_tokens)}
+                          <span class="muted">tokens</span>
+                        </div>
+                        <div class="muted">{formatCost(row.cost)}</div>
+                      {/if}
                     </div>
                   </td>
                 </tr>
@@ -489,21 +455,3 @@
     </div>
   </div>
 </main>
-
-<style>
-  @keyframes row-in {
-    from {
-      opacity: 0;
-      transform: scaleY(0.6);
-    }
-    to {
-      opacity: 1;
-      transform: scaleY(1);
-    }
-  }
-
-  tr[data-new] {
-    animation: row-in 300ms ease-out forwards;
-    transform-origin: top center;
-  }
-</style>
