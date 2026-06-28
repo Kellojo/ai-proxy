@@ -49,7 +49,16 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS model_mappings (
     id TEXT PRIMARY KEY,
     source_model TEXT NOT NULL UNIQUE,
-    target_model TEXT NOT NULL
+    target_model TEXT NOT NULL,
+    provider_id TEXT,
+    FOREIGN KEY(provider_id) REFERENCES providers(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS provider_models (
+    id TEXT PRIMARY KEY,
+    provider_id TEXT NOT NULL UNIQUE,
+    model_ids_json TEXT NOT NULL DEFAULT '[]',
+    last_updated TEXT NOT NULL
   );
 `);
 
@@ -114,8 +123,13 @@ if (!hasRequestLogColumn("remapped_model")) {
   );
 }
 
+const modelMappingsColumns = db.prepare("PRAGMA table_info(model_mappings)").all() as Array<{ name: string }>;
+if (!modelMappingsColumns.some((col) => col.name === "provider_id")) {
+  db.exec("ALTER TABLE model_mappings ADD COLUMN provider_id TEXT");
+}
+
 function mapProvider(row: any): Provider {
-  return {
+  const result: Provider = {
     id: row.id,
     name: row.name,
     kind: row.kind,
@@ -124,6 +138,17 @@ function mapProvider(row: any): Provider {
     isDefault: !!row.is_default,
     createdAt: row.created_at,
   };
+
+  if (row._model_ids_json) {
+    try {
+      result.modelIds = JSON.parse(row._model_ids_json);
+    } catch {
+      result.modelIds = [];
+    }
+    result.lastModelRefreshAt = row._last_model_updated;
+  }
+
+  return result;
 }
 
 function mapVirtualKey(row: any): VirtualKey {
@@ -139,7 +164,12 @@ function mapVirtualKey(row: any): VirtualKey {
 
 export function listProviders(): Provider[] {
   const rows = db
-    .prepare("SELECT * FROM providers ORDER BY created_at DESC")
+    .prepare(
+      `SELECT p.*, pm.model_ids_json AS _model_ids_json, pm.last_updated AS _last_model_updated
+       FROM providers p
+       LEFT JOIN provider_models pm ON pm.provider_id = p.id
+       ORDER BY created_at DESC`,
+    )
     .all();
   return rows.map(mapProvider);
 }
@@ -234,8 +264,55 @@ export function updateProvider(
 }
 
 export function deleteProvider(id: string): boolean {
+  db.prepare("DELETE FROM provider_models WHERE provider_id = ?").run(id);
   const result = db.prepare("DELETE FROM providers WHERE id = ?").run(id);
   return result.changes > 0;
+}
+
+// ── Provider Models ──────────────────────────────────────────────────────
+
+export function getProviderModelIds(providerId: string): { modelIds: string[]; lastUpdated: string | null } | undefined {
+  const row = db.prepare("SELECT * FROM provider_models WHERE provider_id = ?").get(providerId) as any;
+  if (!row) return undefined;
+
+  let modelIds: string[] = [];
+  try {
+    modelIds = JSON.parse(row.model_ids_json);
+  } catch {
+    modelIds = [];
+  }
+
+  return { modelIds, lastUpdated: row.last_updated || null };
+}
+
+export function saveProviderModelIds(providerId: string, modelIds: string[]): void {
+  const id = randomUUID();
+  const now = new Date().toISOString();
+
+  db.prepare(
+    `INSERT INTO provider_models (id, provider_id, model_ids_json, last_updated) VALUES (?, ?, ?, ?)
+     ON CONFLICT(provider_id) DO UPDATE SET model_ids_json = excluded.model_ids_json, last_updated = excluded.last_updated`,
+  ).run(id, providerId, JSON.stringify(modelIds), now);
+}
+
+let cachedProviderModelIds: Map<string, { modelIds: string[]; lastUpdated: string | null }> | null = null;
+
+export function getProvidersWithModels(): Array<{ id: string; name: string; modelIds: string[]; lastUpdated: string | null }> {
+  const rows = db.prepare(
+    "SELECT p.id, p.name, pm.model_ids_json, pm.last_updated FROM providers p LEFT JOIN provider_models pm ON pm.provider_id = p.id ORDER BY p.created_at DESC",
+  ).all() as Array<{ id: string; name: string; model_ids_json: string | null; last_updated: string | null }>;
+
+  return rows.map(row => {
+    let modelIds: string[] = [];
+    try {
+      if (row.model_ids_json) modelIds = JSON.parse(row.model_ids_json);
+    } catch { /* ignore */ }
+    return { id: row.id, name: row.name, modelIds, lastUpdated: row.last_updated };
+  });
+}
+
+export function invalidateProviderModelCache(): void {
+  cachedProviderModelIds = null;
 }
 
 export function listVirtualKeys(): VirtualKey[] {
@@ -439,7 +516,9 @@ if (!tableExists("model_mappings")) {
     CREATE TABLE model_mappings (
       id TEXT PRIMARY KEY,
       source_model TEXT NOT NULL UNIQUE,
-      target_model TEXT NOT NULL
+      target_model TEXT NOT NULL,
+      provider_id TEXT,
+      FOREIGN KEY(provider_id) REFERENCES providers(id) ON DELETE SET NULL
     );
   `);
 }
@@ -448,6 +527,7 @@ export interface ModelMapping {
   id: string;
   sourceModel: string;
   targetModel: string;
+  providerId?: string;
 }
 
 function mapModelMapping(row: any): ModelMapping {
@@ -455,6 +535,7 @@ function mapModelMapping(row: any): ModelMapping {
     id: row.id,
     sourceModel: row.source_model,
     targetModel: row.target_model,
+    providerId: row.provider_id || undefined,
   };
 }
 
@@ -467,7 +548,7 @@ export function listModelMappings(): ModelMapping[] {
   return rows.map(mapModelMapping);
 }
 
-export function createOrUpdateModelMapping(sourceModel: string, targetModel: string): ModelMapping | undefined {
+export function createOrUpdateModelMapping(sourceModel: string, targetModel: string, providerId?: string): ModelMapping | undefined {
   if (!sourceModel.trim() || !targetModel.trim()) {
     throw new Error("source_model and target_model are required");
   }
@@ -475,9 +556,9 @@ export function createOrUpdateModelMapping(sourceModel: string, targetModel: str
   const id = randomUUID();
 
   db.prepare(
-    `INSERT INTO model_mappings (id, source_model, target_model) VALUES (?, ?, ?)
-     ON CONFLICT(source_model) DO UPDATE SET target_model = excluded.target_model`,
-  ).run(id, sourceModel.trim(), targetModel.trim());
+    `INSERT INTO model_mappings (id, source_model, target_model, provider_id) VALUES (?, ?, ?, ?)
+     ON CONFLICT(source_model) DO UPDATE SET target_model = excluded.target_model, provider_id = excluded.provider_id`,
+  ).run(id, sourceModel.trim(), targetModel.trim(), providerId || null);
 
   const row = db
     .prepare("SELECT * FROM model_mappings WHERE source_model = ?")
@@ -491,29 +572,121 @@ export function deleteModelMapping(id: string): boolean {
   return result.changes > 0;
 }
 
-let cachedMappings: Map<string, string> | null = null;
+let cachedMappings: Map<string, { target: string; providerId?: string }> | null = null;
 
-function getMappingCache(): Map<string, string> {
+function getMappingCache(): Map<string, { target: string; providerId?: string }> {
   if (!cachedMappings) {
     cachedMappings = new Map();
     const mappings = listModelMappings();
     for (const m of mappings) {
-      cachedMappings.set(m.sourceModel.toLowerCase(), m.targetModel);
+      cachedMappings.set(m.sourceModel.toLowerCase(), {
+        target: m.targetModel,
+        providerId: m.providerId,
+      });
     }
   }
   return cachedMappings;
 }
 
-export function resolveModelMapping(model: string): string {
+export function resolveModelMapping(model: string): { target: string; providerId?: string } | undefined {
   const cache = getMappingCache();
   const lower = model.toLowerCase().trim();
   if (cache.has(lower)) {
-    console.log(`[ai-proxy] Model remap: "${model}" -> "${cache.get(lower)}"`);
-    return cache.get(lower)!;
+    const entry = cache.get(lower)!;
+    console.log(`[ai-proxy] Model remap: "${model}" -> "${entry.target}"${entry.providerId ? ` (provider: ${entry.providerId})` : ""}`);
+    return entry;
   }
-  return model;
+  return undefined;
 }
 
 export function invalidateModelMappingCache(): void {
   cachedMappings = null;
+}
+
+// ── Provider Models Migration & Periodic Refresh ────────────────────────
+
+if (!tableExists("provider_models")) {
+  db.exec(`
+    CREATE TABLE provider_models (
+      id TEXT PRIMARY KEY,
+      provider_id TEXT NOT NULL UNIQUE,
+      model_ids_json TEXT NOT NULL DEFAULT '[]',
+      last_updated TEXT NOT NULL
+    );
+  `);
+}
+
+const MODEL_REFRESH_INTERVAL_MS = (() => {
+  const raw = process.env.MODEL_LIST_REFRESH_INTERVAL_MS;
+  if (!raw) return 60 * 60 * 1000; // default: 1 hour
+  const parsed = Number.parseInt(raw, 10);
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  return 60 * 60 * 1000;
+})();
+
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+export function startModelRefreshTimer(): void {
+  if (refreshTimer) clearInterval(refreshTimer);
+
+  console.log(`[ai-proxy] Model list auto-refresh interval set to ${MODEL_REFRESH_INTERVAL_MS}ms (${Math.round(MODEL_REFRESH_INTERVAL_MS / 60000)} min)`);
+
+  refreshTimer = setInterval(async () => {
+    try {
+      await fetchAndSaveAllProviderModels();
+    } catch (error: any) {
+      console.error("[ai-proxy] Error during periodic model refresh:", error?.message || "Unknown error");
+    }
+  }, MODEL_REFRESH_INTERVAL_MS);
+
+  // Do an initial refresh after startup
+  setTimeout(async () => {
+    try {
+      await fetchAndSaveAllProviderModels();
+    } catch (error: any) {
+      console.error("[ai-proxy] Error during initial model refresh:", error?.message || "Unknown error");
+    }
+  }, 5000);
+}
+
+export function stopModelRefreshTimer(): void {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
+  }
+}
+
+export async function fetchAndSaveProviderModels(provider: any): Promise<{ ok: boolean; modelIds: string[] }> {
+  const { forwardModelList } = await import("$lib/server/proxy");
+  try {
+    const upstream = await forwardModelList(provider);
+    const text = await upstream.text();
+
+    if (!upstream.ok) {
+      console.log(`[ai-proxy] Model refresh failed for "${provider.name}": HTTP ${upstream.status}`);
+      return { ok: false, modelIds: [] };
+    }
+
+    const payload = JSON.parse(text);
+    const models = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.models) ? payload.models : [];
+    const modelIds = models
+      .filter((m: any) => typeof m?.id === "string" && m.id.length > 0)
+      .map((m: any) => m.id);
+
+    saveProviderModelIds(provider.id, modelIds);
+    console.log(`[ai-proxy] Saved ${modelIds.length} model(s) for provider "${provider.name}" (id: ${provider.id})`);
+    return { ok: true, modelIds };
+  } catch (error: any) {
+    console.error(`[ai-proxy] Error fetching models for "${provider.name}":`, error?.message || "Unknown error");
+    return { ok: false, modelIds: [] };
+  }
+}
+
+export async function fetchAndSaveAllProviderModels(): Promise<void> {
+  const providers = listProviders();
+  if (providers.length === 0) return;
+
+  console.log(`[ai-proxy] Refreshing models for ${providers.length} provider(s)...`);
+
+  await Promise.all(providers.map(p => fetchAndSaveProviderModels(p)));
 }

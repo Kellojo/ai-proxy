@@ -5,9 +5,24 @@ export const MODEL_PREVIEW_MAX_CHARS = 15;
 
 export const providers = writable<Provider[]>([]);
 export const loadingProviders = writable<boolean>(false);
+export const loadingModels = writable<boolean>(false);
 export const error = writable<string>("");
 export const toast = writable<string>("");
 let toastTimeout: ReturnType<typeof setTimeout> | null = null;
+
+const expandedRows = new Set<string>();
+
+export function toggleProviderModelExpansion(providerId: string): void {
+  if (expandedRows.has(providerId)) {
+    expandedRows.delete(providerId);
+  } else {
+    expandedRows.add(providerId);
+  }
+}
+
+export function isProviderExpanded(providerId: string): boolean {
+  return expandedRows.has(providerId);
+}
 
 export function showToast(text: string): void {
   if (toastTimeout) clearTimeout(toastTimeout);
@@ -41,6 +56,36 @@ export async function loadProviders() {
 
 export async function refreshProviderData() {
   await loadProviders();
+}
+
+export async function refreshAllModels(): Promise<void> {
+  loadingModels.set(true);
+  error.set("");
+  try {
+    const res = await fetch("/api/providers/refresh-models", { method: "POST" });
+    if (!res.ok) {
+      const payload = await res.json();
+      error.set(payload?.error || "Failed to refresh models");
+      return;
+    }
+    showToast("Models refreshed for all providers");
+    await loadProviders();
+  } catch {
+    error.set("Failed to refresh models");
+  } finally {
+    loadingModels.set(false);
+  }
+}
+
+export async function fetchProviderModelList(providerId: string): Promise<string[]> {
+  try {
+    const res = await fetch(`/api/providers/${providerId}/models`);
+    if (!res.ok) return [];
+    const payload = await res.json();
+    return payload?.modelIds || [];
+  } catch {
+    return [];
+  }
 }
 
 export async function addProvider(formData: ProviderForm) {

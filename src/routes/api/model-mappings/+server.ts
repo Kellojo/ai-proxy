@@ -12,13 +12,14 @@ export const POST: RequestHandler = async ({ request }) => {
     const body = await request.json();
     const sourceModel = body?.source_model;
     const targetModel = body?.target_model;
+    const providerId = body?.provider_id || undefined;
 
     if (!sourceModel || !targetModel) {
       throw new Error("source_model and target_model are required");
     }
 
     invalidateModelMappingCache();
-    const mapping = createOrUpdateModelMapping(sourceModel, targetModel);
+    const mapping = createOrUpdateModelMapping(sourceModel, targetModel, providerId);
     return json({ mapping }, { status: 201 });
   } catch (error: any) {
     return json({ error: error.message || "Invalid request" }, { status: 400 });

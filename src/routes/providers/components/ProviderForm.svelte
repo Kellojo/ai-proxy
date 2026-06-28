@@ -28,17 +28,18 @@
   </div>
   <div>
     <label for="provider-kind">Kind</label>
-      <select id="provider-kind" bind:value={formData.kind} onchange={() => onKindChange(formData.kind)}>
-        {#each PROVIDER_KINDS as kindOption}
-          <option value={kindOption.value}>{kindOption.label}</option>
-        {/each}
-      </select>
+    <select id="provider-kind" bind:value={formData.kind} onchange={() => onKindChange(formData.kind)}>
+      {#each PROVIDER_KINDS as kindOption}
+        <option value={kindOption.value}>{kindOption.label}</option>
+      {/each}
+    </select>
   </div>
   <div>
     <label for="provider-endpoint">Endpoint URL</label>
     <input
       id="provider-endpoint"
       bind:value={formData.endpointUrl}
+      disabled={formData.kind !== 'openai-compatible'}
       placeholder="https://api.openai.com"
       oninput={() => onFieldChange(formData)}
     />

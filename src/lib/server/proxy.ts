@@ -124,7 +124,7 @@ export async function forwardChatCompletion(
   body: any,
 ): Promise<Response> {
   return forwardRequest(provider, {
-    endpoint: "/v1/chat/completions",
+    endpoint: "chat/completions",
     headers: { "content-type": "application/json", authorization: `Bearer ${provider.apiKey}` },
     requestBody: body,
   });
@@ -133,7 +133,7 @@ export async function forwardChatCompletion(
 // ── Model list endpoint ──────────────────────────────────────────────────
 
 export async function forwardModelList(provider: Provider): Promise<Response> {
-  const targetUrl = buildUrl(provider.endpointUrl, "/v1/models");
+  const targetUrl = buildUrl(provider.endpointUrl, "models");
 
   return fetchWithTimeout(targetUrl, {
     method: "GET",

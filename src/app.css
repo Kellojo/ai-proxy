@@ -206,19 +206,56 @@ textarea {
 }
 
 input:focus,
-select:focus,
 textarea:focus {
   outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
   outline-offset: 1px;
   border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
 }
 
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.2rem;
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--line) 60%, var(--glass-border));
+  border-radius: 8px;
+  padding-top: 0.56rem;
+  padding-bottom: 0.56rem;
+  padding-left: 0.68rem;
+  background-color: color-mix(in srgb, var(--paper-soft) 52%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--ink);
+  font-family: inherit;
+  line-height: 1.4;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M2 5l6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 1rem;
+}
+
+select:hover {
+  background-color: color-mix(in srgb, var(--paper-soft) 45%, transparent);
+}
+
+select:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
+}
+
+select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 button {
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, #5a3e92 55%);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
   border-radius: 8px;
   padding: 0.46rem 0.82rem;
   cursor: pointer;
-  background-color: color-mix(in srgb, var(--accent) 82%, #b28aff 18%);
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+
   color: #ffffff;
   font-weight: 600;
   transition:
@@ -248,13 +285,16 @@ button.ghost {
 }
 
 button.danger {
-  border-color: color-mix(in srgb, var(--error) 62%, var(--borderColor));
-  background-color: color-mix(in srgb, var(--error) 86%, #ffb0b0 14%);
-  color: #ffffff;
+  border: 1px solid color-mix(in srgb, var(--error) 45%, var(--line));
+  background-color: color-mix(in srgb, var(--paper-soft) 46%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--error);
 }
 
 button.danger:hover {
-  filter: brightness(1.08);
+  background-color: color-mix(in srgb, var(--error) 12%, var(--paper-soft));
+  border-color: color-mix(in srgb, var(--error) 65%, var(--line));
 }
 
 .row {
@@ -621,6 +661,7 @@ a:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin-top: 0.25rem;
 }
 
 .wol-detail {

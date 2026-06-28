@@ -1,10 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import Button from "$lib/svelte-components/Button.svelte";
 
   type ModelMapping = {
     id: string;
     sourceModel: string;
     targetModel: string;
+    providerId?: string;
   };
 
   let mappings: ModelMapping[] = [];
@@ -12,12 +14,20 @@
   let message = "";
   let error = "";
   let toastMessage = "";
+
+  type DropdownOption = { id: string; name: string };
+  let allModels: DropdownOption[] = [];
+  let allProviders: DropdownOption[] = [];
+  let optionsLoading = false;
+
   let newSource = "";
   let newTarget = "";
+  let newProviderId = "";
 
   let editId: string | null = null;
   let editingSource = "";
   let editingTarget = "";
+  let editingProviderId = "";
 
   let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -27,6 +37,19 @@
     const data = (await res.json()) as { mappings?: ModelMapping[] };
     mappings = data.mappings || [];
     loading = false;
+  }
+
+  async function loadDropdownOptions() {
+    optionsLoading = true;
+    try {
+      const res = await fetch("/api/model-mappings/options");
+      if (!res.ok) return;
+      const data = (await res.json()) as { models?: string[]; providers?: DropdownOption[] };
+      allModels = ((data.models || []).map((m) => ({ id: m, name: m }))).sort((a, b) => a.name.localeCompare(b.name));
+      allProviders = ((data.providers || []) as DropdownOption[]).sort((a, b) => a.name.localeCompare(b.name));
+    } finally {
+      optionsLoading = false;
+    }
   }
 
   function showToast(text: string) {
@@ -45,7 +68,7 @@
     const res = await fetch("/api/model-mappings", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ source_model: newSource, target_model: newTarget }),
+      body: JSON.stringify({ source_model: newSource, target_model: newTarget, provider_id: newProviderId || undefined }),
     });
 
     const payload = (await res.json()) as { mapping?: ModelMapping; error?: string };
@@ -56,6 +79,7 @@
 
     newSource = "";
     newTarget = "";
+    newProviderId = "";
     showToast(`Remap "${payload.mapping!.sourceModel}" -> "${payload.mapping!.targetModel}" added`);
     await loadMappings();
   }
@@ -64,12 +88,14 @@
     editId = mapping.id;
     editingSource = mapping.sourceModel;
     editingTarget = mapping.targetModel;
+    editingProviderId = mapping.providerId || "";
   }
 
   function cancelEdit() {
     editId = null;
     editingSource = "";
     editingTarget = "";
+    editingProviderId = "";
   }
 
   async function saveEdit(id: string) {
@@ -79,7 +105,7 @@
     const res = await fetch(`/api/model-mappings/${id}`, {
       method: "PUT",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ source_model: editingSource, target_model: editingTarget }),
+      body: JSON.stringify({ source_model: editingSource, target_model: editingTarget, provider_id: editingProviderId || undefined }),
     });
 
     if (!res.ok) {
@@ -106,7 +132,9 @@
     if (toastTimeout) clearTimeout(toastTimeout);
   }
 
-  onMount(loadMappings);
+  onMount(async () => {
+    await Promise.all([loadMappings(), loadDropdownOptions()]);
+  });
 </script>
 
 <main>
@@ -128,6 +156,7 @@
 
   <div class="card" style="padding: 1rem; margin-bottom: 1.5rem;">
     <h3 style="margin-top: 0;">Add New Remap</h3>
+    {#if optionsLoading}<p class="muted">Loading available models...</p>{/if}
     <form
       onsubmit={(e) => {
         e.preventDefault();
@@ -147,13 +176,40 @@
         </div>
         <div style="flex: 1; min-width: 180px;">
           <label for="new-target">Target model name</label>
-          <input
-            id="new-target"
-            type="text"
-            bind:value={newTarget}
-            placeholder='e.g. "vibethinker-3b"'
-            required
-          />
+          {#if allModels.length > 0}
+            <select id="new-target" bind:value={newTarget}>
+              <option value="">Select a model...</option>
+              {#each allModels as option}
+                <option value={option.id}>{option.name}</option>
+              {/each}
+            </select>
+          {:else}
+            <input
+              id="new-target"
+              type="text"
+              bind:value={newTarget}
+              placeholder='e.g. "coding--3b"'
+              required
+            />
+          {/if}
+        </div>
+        <div style="flex: 1; min-width: 180px;">
+          <label for="new-provider">Provider override (optional)</label>
+          {#if allProviders.length > 0}
+            <select id="new-provider" bind:value={newProviderId}>
+              <option value="">Auto-select provider</option>
+              {#each allProviders as option}
+                <option value={option.id}>{option.name}</option>
+              {/each}
+            </select>
+          {:else}
+            <input
+              id="new-provider"
+              type="text"
+              bind:value={newProviderId}
+              placeholder="provider ID or name"
+            />
+          {/if}
         </div>
         <div>
           <button type="submit" style="width: 100%; height: calc(1.5em + 0.75rem);" disabled={!newSource.trim() || !newTarget.trim()}>
@@ -175,9 +231,10 @@
       <table class="logs-table entity-table" style="table-layout: fixed;">
         <thead>
           <tr>
-            <th style="width: 30%;">Source Model (alias)</th>
-            <th style="width: 45%;">Target Model (real name)</th>
-            <th style="width: 25%;">Actions</th>
+            <th style="width: 25%;">Source Model (alias)</th>
+            <th style="width: 30%;">Target Model (real name)</th>
+            <th style="width: 25%;">Provider</th>
+            <th style="width: 20%;">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -192,16 +249,41 @@
                   />
                 </td>
                 <td>
-                  <input
-                    type="text"
-                    bind:value={editingTarget}
-                    class="inline-edit"
-                  />
+                  {#if allModels.length > 0}
+                    <select bind:value={editingTarget}>
+                      {#each allModels as option}
+                        <option value={option.id}>{option.name}</option>
+                      {/each}
+                    </select>
+                  {:else}
+                    <input
+                      type="text"
+                      bind:value={editingTarget}
+                      class="inline-edit"
+                    />
+                  {/if}
+                </td>
+                <td>
+                  {#if allProviders.length > 0}
+                    <select bind:value={editingProviderId}>
+                      <option value="">Auto</option>
+                      {#each allProviders as option}
+                        <option value={option.id}>{option.name}</option>
+                      {/each}
+                    </select>
+                  {:else}
+                    <input
+                      type="text"
+                      bind:value={editingProviderId}
+                      class="inline-edit"
+                      placeholder="optional"
+                    />
+                  {/if}
                 </td>
                 <td>
                   <div class="table-actions">
-                    <button class="ghost" onclick={cancelEdit}>Cancel</button>
-                    <button onclick={() => saveEdit(mapping.id)}>Save</button>
+                    <Button variant="ghost" on:click={cancelEdit}>Cancel</Button>
+                    <Button on:click={() => saveEdit(mapping.id)}>Save</Button>
                   </div>
                 </td>
               </tr>
@@ -210,16 +292,28 @@
                 <td><code>{mapping.sourceModel}</code></td>
                 <td><code>{mapping.targetModel}</code></td>
                 <td>
+                  {#if mapping.providerId}
+                    {@const mappedProvider = allProviders.find((p) => p.id === mapping.providerId)}
+                    {#if mappedProvider}
+                      <span class="muted">{mappedProvider.name}</span>
+                    {:else}
+                      <code>{mapping.providerId}</code>
+                    {/if}
+                  {:else}
+                    <span class="muted">auto</span>
+                  {/if}
+                </td>
+                <td>
                   <div class="table-actions">
-                    <button class="ghost" onclick={() => startEdit(mapping)}>
+                    <Button variant="ghost" on:click={() => startEdit(mapping)}>
                       Edit
-                    </button>
-                    <button
-                      class="danger"
-                      onclick={() => removeMapping(mapping.id, mapping.sourceModel)}
+                    </Button>
+                    <Button
+                      variant="danger"
+                      on:click={() => removeMapping(mapping.id, mapping.sourceModel)}
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </td>
               </tr>
@@ -246,6 +340,25 @@
   }
 
   :global(.inline-edit):focus {
+    outline: none;
+    border-color: var(--accentBlue, #5b9aff);
+  }
+
+  select {
+    width: 100%;
+    padding: 0.25rem 0.35rem;
+    height: calc(1.5em + 0.75rem);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.85rem;
+    background: var(--bg-input, #1a1d23);
+    border: 1px solid var(--line, #2a2d34);
+    color: var(--primaryText, #e6e8eb);
+    border-radius: 4px;
+    box-sizing: border-box;
+    cursor: pointer;
+  }
+
+  select:focus {
     outline: none;
     border-color: var(--accentBlue, #5b9aff);
   }

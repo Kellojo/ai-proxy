@@ -41,7 +41,7 @@ describe("AI Proxy Integration Tests", () => {
         body: JSON.stringify({
           name: "lm-studio-provider",
           kind: "openai-compatible",
-          endpointUrl: process.env.TEST_LIVE_PROVIDER_URL || "http://localhost:1234",
+          endpointUrl: process.env.TEST_LIVE_PROVIDER_URL || "http://localhost:1234/v1",
           apiKey: "local",
           isDefault: true,
         }),

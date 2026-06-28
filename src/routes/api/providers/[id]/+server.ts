@@ -1,9 +1,25 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
-import { deleteProvider, getProvider, updateProvider, validateProviderInput } from "$lib/server/db";
+import { deleteProvider, fetchAndSaveProviderModels, getProvider, updateProvider, validateProviderInput } from "$lib/server/db";
 
-function sanitizeProvider<T extends { apiKey?: string }>(provider: T) {
-  const { apiKey, ...safeProvider } = provider;
+function sanitizeProvider<T extends { apiKey?: string; modelIds?: unknown }>(provider: T) {
+  const { apiKey, ...safeProvider } = provider as any;
+  if (typeof safeProvider.model_ids_json === "string") {
+    try {
+      const parsed = JSON.parse(safeProvider.model_ids_json);
+      safeProvider.modelIds = Array.isArray(parsed) ? parsed : [];
+      safeProvider.modelCount = safeProvider.modelIds.length;
+    } catch {
+      safeProvider.modelIds = [];
+      safeProvider.modelCount = 0;
+    }
+    delete (safeProvider as any).model_ids_json;
+  } else if (Array.isArray(safeProvider.modelIds)) {
+    safeProvider.modelCount = safeProvider.modelIds.length;
+  } else {
+    safeProvider.modelIds = [];
+    safeProvider.modelCount = 0;
+  }
   return safeProvider;
 }
 
@@ -25,6 +41,11 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     if (!provider) {
       return json({ error: "Provider not found" }, { status: 404 });
     }
+
+    // Fetch models in the background so we don't block the response
+    fetchAndSaveProviderModels(provider).catch((err: any) => {
+      console.error("[ai-proxy] Background model refresh failed:", err?.message || "Unknown error");
+    });
 
     return json({ provider: sanitizeProvider(provider) });
   } catch (error: any) {

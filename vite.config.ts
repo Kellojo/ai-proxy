@@ -15,7 +15,7 @@ export default defineConfig({
     env: {
       DATABASE_PATH: "./data/ai-proxy-test.db",
       TEST_LIVE_PROVIDER_KIND: "openai",
-      TEST_LIVE_PROVIDER_URL: "http://localhost:1234",
+      TEST_LIVE_PROVIDER_URL: "http://localhost:1234/v1",
       TEST_MODEL: "ornith-1.0-35b",
       TEST_LIVE_PROVIDER_API_KEY: "dummy",
     },

@@ -8,6 +8,8 @@ export interface Provider {
   apiKey: string;
   isDefault: boolean;
   createdAt: string;
+  modelIds?: string[];
+  lastModelRefreshAt?: string;
 }
 
 export interface ProviderInput {

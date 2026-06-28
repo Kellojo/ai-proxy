@@ -23,6 +23,9 @@ export interface Provider {
   kind: ProviderKind;
   endpointUrl: string;
   isDefault: boolean;
+  modelIds?: string[];
+  modelCount?: number;
+  lastModelRefreshAt?: string | null;
 }
 
 /** Form state for creating or editing a provider. */

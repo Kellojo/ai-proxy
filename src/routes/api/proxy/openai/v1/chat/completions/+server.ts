@@ -1,5 +1,6 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
+import { buildProviderOrder } from "$lib/server/common-server";
 import {
   authenticateVirtualKey,
   getDefaultProvider,
@@ -44,12 +45,16 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   const model = body?.model || "unknown-model";
-  const resolvedModel = resolveModelMapping(model);
+  const resolvedMapping = resolveModelMapping(model);
 
   // Update the request body to use the remapped model when forwarding upstream
-  if (resolvedModel !== model) {
-    body.model = resolvedModel;
+  if (resolvedMapping && resolvedMapping.target !== model) {
+    body.model = resolvedMapping.target;
   }
+
+  // For logging: store the original requested model as remapped_model. When a mapping exists,
+  // also record which target it mapped to so the log reflects what was actually forwarded upstream.
+  const remappedModelForLog = resolvedMapping?.target || model;
 
   function resolveProviderId(req: any): string | undefined {
     return (
@@ -60,13 +65,19 @@ export const POST: RequestHandler = async ({ request }) => {
     );
   }
 
+  const explicitProviderId = resolveProviderId(request);
   let providerName: string | undefined;
-  if (body.providerId) {
-    const p = getProvider(body.providerId);
+  if (explicitProviderId) {
+    const p = getProvider(explicitProviderId);
     if (!p) {
       return json({ error: "Provider not found" }, { status: 404 });
     }
     providerName = p.name;
+  } else if (resolvedMapping?.providerId) {
+    const mappedProvider = getProvider(resolvedMapping.providerId);
+    if (mappedProvider) {
+      providerName = mappedProvider.name;
+    }
   } else {
     const defaultProvider = getDefaultProvider();
     if (defaultProvider) {
@@ -75,10 +86,11 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   // Register as an active request
-  const runId = startRequest({ model, providerId: body.providerId || undefined, providerName, virtualKey: virtualKey.name });
+  const effectiveProviderId = explicitProviderId || resolvedMapping?.providerId || undefined;
+  const runId = startRequest({ model, providerId: effectiveProviderId, providerName, virtualKey: virtualKey.name });
 
   try {
-    return await handleAuthenticatedRequest({ startedAt, body, allProviders, model, virtualKey,       providerId: resolveProviderId(request), resolvedModel });
+    return await handleAuthenticatedRequest({ startedAt, body, allProviders, model, virtualKey,       providerId: explicitProviderId, resolvedModel: remappedModelForLog });
   } finally {
     finishRequest(runId);
   }
@@ -139,7 +151,49 @@ async function handleAuthenticatedRequest(params: {
     return await processResponse(upstream, model, explicitProvider.id, body.stream === true, virtualKey.id, startedAt, resolvedModel);
   }
 
-  const providersToTry = allProviders;
+  // No explicit providerId — try to find the right provider by matching the requested model.
+  const { getProvidersWithModels } = await import("$lib/server/db");
+  const providersWithModels = getProvidersWithModels();
+
+  let orderedProviders: Provider[];
+  if (providersWithModels.length > 0) {
+    // Build a set of models known to each provider for fast lookup.
+    const providerModelMap = new Map<string, Set<string>>();
+    const defaultProviderIds = new Set<string>();
+    for (const p of providersWithModels) {
+      if (p.modelIds && p.modelIds.length > 0) {
+        providerModelMap.set(p.id, new Set(p.modelIds));
+      }
+      const candidate = allProviders.find(ap => ap.id === p.id);
+      if (candidate?.isDefault) defaultProviderIds.add(p.id);
+    }
+
+    // Find providers that have this model in their known set.
+    const matchingProviders = providersWithModels.filter(
+      p => providerModelMap.get(p.id)?.has(resolvedModel ?? model),
+    );
+    const matchingIds = new Set(matchingProviders.map(p => p.id));
+
+    console.log(`[ai-proxy] Model "${resolvedModel ?? model}" known in ${matchingProviders.length} provider(s): ${[...matchingIds].join(", ") || "(none)"}`);
+
+    // If we found matches, prioritize the default provider first among them.
+    if (matchingProviders.length > 0) {
+      const sorted = buildProviderOrder(
+        allProviders.filter(p => matchingIds.has(p.id)),
+      );
+      orderedProviders = sorted;
+    } else {
+      // No match found — fall back to trying all providers in order.
+      console.log(`[ai-proxy] Model "${resolvedModel ?? model}" not known in any provider, trying all ${allProviders.length} provider(s)`);
+      orderedProviders = buildProviderOrder(allProviders);
+    }
+  } else {
+    // No stored models — fall back to default-first ordering.
+    console.log(`[ai-proxy] No stored model data available, using default-first ordering for ${allProviders.length} provider(s)`);
+    orderedProviders = buildProviderOrder(allProviders);
+  }
+
+  const providersToTry = orderedProviders;
   console.log(
     `[ai-proxy] Provider attempt order: ${providersToTry.map(p => `"${p.name}" (id: ${p.id})`).join(", ")}`,
   );
