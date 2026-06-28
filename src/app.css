@@ -62,10 +62,9 @@ h3 {
   letter-spacing: 0;
 }
 
-
 .grid {
   display: grid;
-  gap: 1rem;
+  gap: 2rem;
   grid-template-columns: repeat(12, 1fr);
 }
 
@@ -817,4 +816,3 @@ pre {
   overflow-x: auto;
   color: var(--primaryText);
 }
-
