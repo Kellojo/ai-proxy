@@ -1,5 +1,8 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
+
+  import Tag from "$lib/svelte-components/Tag.svelte";
+
   import {
     statusTone,
     displayModelName,
@@ -385,10 +388,10 @@
                   </td>
                   <td style="width: 120px;">
                     <div class="cell-stack">
-                      <span class="status-pill running">
+                      <Tag variant="running">
                         <span class="running-spinner"></span>
                         Running
-                      </span>
+                      </Tag>
                       <div></div>
                     </div>
                   </td>
@@ -430,11 +433,9 @@
                   </td>
                   <td>
                     <div class="cell-stack">
-                      <span
-                        class={`status-pill ${statusTone(row.status_code)}`}
-                      >
+                      <Tag variant={statusTone(row.status_code)}>
                         {row.status_code}
-                      </span>
+                      </Tag>
                       <div></div>
                     </div>
                   </td>

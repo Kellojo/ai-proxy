@@ -1,6 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { toast } from "svelte-sonner";
+  import Icon from "$lib/svelte-components/Icon.svelte";
+
   import Button from "$lib/svelte-components/Button.svelte";
+  import Tag from "$lib/svelte-components/Tag.svelte";
 
   type ModelMapping = {
     id: string;
@@ -13,7 +17,6 @@
   let loading = true;
   let message = "";
   let error = "";
-  let toastMessage = "";
 
   type DropdownOption = { id: string; name: string };
   let allModels: DropdownOption[] = [];
@@ -28,8 +31,6 @@
   let editingSource = "";
   let editingTarget = "";
   let editingProviderId = "";
-
-  let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
   async function loadMappings() {
     loading = true;
@@ -52,15 +53,6 @@
     }
   }
 
-  function showToast(text: string) {
-    toastMessage = text;
-    if (toastTimeout) clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(() => {
-      toastMessage = "";
-      toastTimeout = null;
-    }, 1800);
-  }
-
   async function addMapping() {
     message = "";
     error = "";
@@ -80,7 +72,7 @@
     newSource = "";
     newTarget = "";
     newProviderId = "";
-    showToast(`Remap "${payload.mapping!.sourceModel}" -> "${payload.mapping!.targetModel}" added`);
+    toast.success(`Remap "${payload.mapping!.sourceModel}" -> "${payload.mapping!.targetModel}" added`);
     await loadMappings();
   }
 
@@ -115,7 +107,7 @@
     }
 
     editId = null;
-    showToast("Mapping updated");
+    toast.success("Mapping updated");
     await loadMappings();
   }
 
@@ -124,12 +116,8 @@
     if (!confirmed) return;
 
     await fetch(`/api/model-mappings/${id}`, { method: "DELETE" });
-    showToast(`Removed remap for "${sourceModel}"`);
+    toast.success(`Removed remap for "${sourceModel}"`);
     await loadMappings();
-  }
-
-  $: {
-    if (toastTimeout) clearTimeout(toastTimeout);
   }
 
   onMount(async () => {
@@ -149,7 +137,6 @@
       </div>
     </div>
 
-    {#if toastMessage}<div class="mini-toast">{toastMessage}</div>{/if}
     {#if message}<div class="notice">{message}</div>{/if}
     {#if error}<div class="error">{error}</div>{/if}
   </div>
@@ -212,9 +199,9 @@
           {/if}
         </div>
         <div>
-          <button type="submit" style="width: 100%; height: calc(1.5em + 0.75rem);" disabled={!newSource.trim() || !newTarget.trim()}>
-            Add Remap
-          </button>
+          <Button type="submit" disabled={!newSource.trim() || !newTarget.trim()}>
+            <Icon icon="tabler:shuffle" /> Add Remap
+          </Button>
         </div>
       </div>
     </form>
@@ -282,15 +269,19 @@
                 </td>
                 <td>
                   <div class="table-actions">
-                    <Button variant="ghost" on:click={cancelEdit}>Cancel</Button>
-                    <Button on:click={() => saveEdit(mapping.id)}>Save</Button>
+                    <Button variant="ghost" on:click={cancelEdit}>
+                      <Icon icon="tabler:x" /> Cancel
+                    </Button>
+                    <Button on:click={() => saveEdit(mapping.id)}>
+                      <Icon icon="tabler:check" /> Save
+                    </Button>
                   </div>
                 </td>
               </tr>
             {:else}
               <tr>
-                <td><code>{mapping.sourceModel}</code></td>
-                <td><code>{mapping.targetModel}</code></td>
+                <td><Tag variant="neutral">{mapping.sourceModel}</Tag></td>
+                <td><Tag variant="neutral">{mapping.targetModel}</Tag></td>
                 <td>
                   {#if mapping.providerId}
                     {@const mappedProvider = allProviders.find((p) => p.id === mapping.providerId)}
@@ -300,19 +291,19 @@
                       <code>{mapping.providerId}</code>
                     {/if}
                   {:else}
-                    <span class="muted">auto</span>
+                    <Tag variant="ok">auto</Tag>
                   {/if}
                 </td>
                 <td>
                   <div class="table-actions">
                     <Button variant="ghost" on:click={() => startEdit(mapping)}>
-                      Edit
+                      <Icon icon="tabler:pencil" /> Edit
                     </Button>
                     <Button
                       variant="danger"
                       on:click={() => removeMapping(mapping.id, mapping.sourceModel)}
                     >
-                      Delete
+                      <Icon icon="tabler:trash-x" /> Delete
                     </Button>
                   </div>
                 </td>

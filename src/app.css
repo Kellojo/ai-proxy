@@ -1,4 +1,5 @@
 @import "./colors.css";
+@import "$lib/svelte-components/library.css";
 
 @font-face {
   font-family: "Varela Round";
@@ -110,6 +111,10 @@ main {
 }
 
 .nav a {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+
   text-decoration: none;
   color: var(--muted);
   border: 1px solid color-mix(in srgb, var(--line) 65%, var(--glass-border));
@@ -249,54 +254,6 @@ select:disabled {
   cursor: not-allowed;
 }
 
-button {
-  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line));
-  border-radius: 8px;
-  padding: 0.46rem 0.82rem;
-  cursor: pointer;
-  background: color-mix(in srgb, var(--accent) 24%, transparent);
-
-  color: #ffffff;
-  font-weight: 600;
-  transition:
-    transform 110ms ease-out,
-    filter 110ms ease-out;
-}
-
-button:hover {
-  filter: brightness(1.06);
-  transform: translateY(-1px);
-}
-
-button.alt {
-  border-color: color-mix(in srgb, var(--line) 70%, var(--glass-border));
-  background: color-mix(in srgb, var(--paper-soft) 60%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: var(--ink);
-}
-
-button.ghost {
-  background: color-mix(in srgb, var(--paper-soft) 46%, transparent);
-  color: var(--ink);
-  border: 1px solid color-mix(in srgb, var(--line) 65%, var(--glass-border));
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-}
-
-button.danger {
-  border: 1px solid color-mix(in srgb, var(--error) 45%, var(--line));
-  background-color: color-mix(in srgb, var(--paper-soft) 46%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: var(--error);
-}
-
-button.danger:hover {
-  background-color: color-mix(in srgb, var(--error) 12%, var(--paper-soft));
-  border-color: color-mix(in srgb, var(--error) 65%, var(--line));
-}
-
 .row {
   display: flex;
   gap: 0.5rem;
@@ -385,18 +342,6 @@ a:hover {
   color: color-mix(in srgb, var(--error) 72%, #ffffff 28%);
   padding: 0.6rem 0.8rem;
   border-radius: 8px;
-}
-
-.mini-toast {
-  width: fit-content;
-  padding: 0.35rem 0.55rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
-  background: color-mix(in srgb, var(--accent) 18%, var(--background));
-  color: color-mix(in srgb, var(--accent) 70%, #ffffff 30%);
-  font-size: 0.78rem;
-  line-height: 1.1;
-  animation: toast-pop 160ms ease-out;
 }
 
 .page-header {
@@ -516,18 +461,6 @@ a:hover {
 
   to {
     opacity: 0;
-  }
-}
-
-@keyframes toast-pop {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 
@@ -681,36 +614,6 @@ a:hover {
   justify-content: flex-end;
 }
 
-.status-pill {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 56px;
-  border-radius: 999px;
-  padding: 0.15rem 0.55rem;
-  border: 1px solid var(--line);
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
-.status-pill.ok {
-  color: color-mix(in srgb, var(--success) 72%, #ffffff 28%);
-  border-color: color-mix(in srgb, var(--success) 48%, transparent);
-  background: color-mix(in srgb, var(--success) 16%, transparent);
-}
-
-.status-pill.warn {
-  color: color-mix(in srgb, var(--warning) 72%, #ffffff 28%);
-  border-color: color-mix(in srgb, var(--warning) 48%, transparent);
-  background: color-mix(in srgb, var(--warning) 16%, transparent);
-}
-
-.status-pill.error {
-  color: color-mix(in srgb, var(--error) 72%, #ffffff 28%);
-  border-color: color-mix(in srgb, var(--error) 48%, transparent);
-  background: color-mix(in srgb, var(--error) 16%, transparent);
-}
-
 .hist-legend {
   display: flex;
   gap: 0.9rem;
@@ -758,13 +661,6 @@ a:hover {
 
 .dot.error {
   background-image: linear-gradient(0deg, var(--errorSecondary), var(--error));
-}
-
-.status-pill.running {
-  position: relative;
-  color: color-mix(in srgb, var(--info) 72%, #ffffff 28%);
-  border-color: color-mix(in srgb, var(--info) 48%, transparent);
-  background: color-mix(in srgb, var(--info) 16%, transparent);
 }
 
 .running-spinner {
@@ -869,10 +765,6 @@ a:hover {
       0 0 12px 1px rgba(var(--info-rgb, 89 130 247), 0.4),
       0 0 24px -2px rgba(var(--info-rgb, 89 130 247), 0.25);
   }
-}
-
-.status-pill.running {
-  animation: running-bubble-glow 2s ease-in-out infinite;
 }
 
 @keyframes latency-breathe {

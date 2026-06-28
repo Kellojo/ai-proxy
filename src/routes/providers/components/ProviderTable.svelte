@@ -6,11 +6,20 @@
     refreshAllModels,
     loadingModels,
   } from "../providers-store";
+
   import type { Provider } from "../types";
 
-  export let onEditProvider: (provider: Provider) => void;
-  export let onDeleteProvider: (id: string) => void;
-  export let onCreateProvider: () => void;
+  import Button from "$lib/svelte-components/Button.svelte";
+  import Tag from "$lib/svelte-components/Tag.svelte";
+  import Icon from "$lib/svelte-components/Icon.svelte";
+
+  interface Props {
+    onEditProvider: (provider: Provider) => void;
+    onDeleteProvider: (id: string) => void;
+    onCreateProvider: () => void;
+  }
+
+  const { onEditProvider, onDeleteProvider, onCreateProvider } = $props<Props>();
 
   function formatLastRefresh(timestamp?: string | null): string {
     if (!timestamp) return "-";
@@ -44,11 +53,15 @@
     </div>
     <div class="stack" style="display: flex; flex-direction: row; gap: 0.5rem;">
       {#if !$loadingModels}
-        <button class="ghost" onclick={refreshAllModels}>Refresh Models</button>
+        <Button variant="ghost" on:click={refreshAllModels}>
+          <Icon icon="tabler:refresh" /> Refresh Models
+        </Button>
       {:else}
         <span class="muted">Refreshing...</span>
       {/if}
-      <button onclick={onCreateProvider}>New Provider</button>
+      <Button on:click={onCreateProvider}>
+        <Icon icon="tabler:plus" /> New Provider
+      </Button>
     </div>
   </div>
 </div>
@@ -81,7 +94,7 @@
               <span class="kind-chip">{provider.kind}</span>
               {#if provider.isDefault}
                 <div style="margin-top: 0.35rem;">
-                  <span class="status-pill ok">Default</span>
+                <Tag variant="ok">Default</Tag>
                 </div>
               {:else}
                 <div class="muted" style="margin-top: 0.35rem;">
@@ -103,13 +116,15 @@
             </td>
             <td>
               <div class="table-actions">
-                <button class="ghost" onclick={() => onEditProvider(provider)}
-                  >Edit</button
+                <Button variant="ghost" on:click={() => onEditProvider(provider)}>
+                  <Icon icon="tabler:pencil" /> Edit
+                </Button>
+                <Button
+                  variant="danger"
+                  on:click={() => onDeleteProvider(provider.id)}
                 >
-                <button
-                  class="danger"
-                  onclick={() => onDeleteProvider(provider.id)}>Delete</button
-                >
+                  <Icon icon="tabler:trash-x" /> Delete
+                </Button>
               </div>
             </td>
           </tr>

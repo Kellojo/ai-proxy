@@ -1,0 +1,7 @@
+:root {
+  --ink: var(--primaryText);
+  --muted: var(--secondaryText);
+  --error: #f87171;
+  --line: color-mix(in srgb, var(--borderColor) 65%, transparent);
+  --glass-border: rgba(255, 255, 255, 0.14);
+}

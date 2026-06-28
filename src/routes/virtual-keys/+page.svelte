@@ -1,5 +1,10 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
+  import { toast } from "svelte-sonner";
+  import Icon from "$lib/svelte-components/Icon.svelte";
+
+  import Button from "$lib/svelte-components/Button.svelte";
+  import Tag from "$lib/svelte-components/Tag.svelte";
 
   type VirtualKey = {
     id: string;
@@ -14,12 +19,9 @@
   const DIALOG_ANIMATION_MS = 140;
 
   let keyName = "";
-  let message = "";
   let error = "";
-  let toastMessage = "";
   let showCreateModal = false;
   let createModalClosing = false;
-  let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
   let createDialog: HTMLDialogElement | null = null;
 
@@ -35,7 +37,6 @@
   }
 
   async function createVirtualKey() {
-    message = "";
     error = "";
 
     const res = await fetch("/api/virtual-keys", {
@@ -50,28 +51,17 @@
       return;
     }
 
-    message = `Created key ${payload.key.name}`;
-
     if (payload.plaintext) {
       try {
         await navigator.clipboard.writeText(payload.plaintext);
-        showToast("Key copied to clipboard");
+        toast.success("Key copied to clipboard");
       } catch {
-        showToast("Key created, but clipboard access failed");
+        toast.error("Key created, but clipboard access failed");
       }
     }
 
     closeCreateModal();
     await loadKeys();
-  }
-
-  function showToast(text: string) {
-    toastMessage = text;
-    if (toastTimeout) clearTimeout(toastTimeout);
-    toastTimeout = setTimeout(() => {
-      toastMessage = "";
-      toastTimeout = null;
-    }, 1800);
   }
 
   function openCreateModal() {
@@ -103,15 +93,14 @@
     });
     const payload = await res.json();
     if (res.ok) {
-      message = `Rerolled key ${payload.key.name}`;
       error = "";
 
       if (payload.plaintext) {
         try {
           await navigator.clipboard.writeText(payload.plaintext);
-          showToast("Rerolled key copied to clipboard");
+          toast.success("Rerolled key copied to clipboard");
         } catch {
-          showToast("Key rerolled, but clipboard access failed");
+          toast.error("Key rerolled, but clipboard access failed");
         }
       }
 
@@ -164,10 +153,6 @@
   }
 
   onMount(loadKeys);
-
-  onDestroy(() => {
-    if (toastTimeout) clearTimeout(toastTimeout);
-  });
 </script>
 
 <main>
@@ -179,10 +164,11 @@
           Manage client-facing keys used to access proxy endpoints.
         </p>
       </div>
-      <button on:click={openCreateModal}>New Key</button>
+      <Button on:click={openCreateModal}>
+        <Icon icon="tabler:plus" />
+        New Key
+      </Button>
     </div>
-    {#if toastMessage}<div class="mini-toast">{toastMessage}</div>{/if}
-    {#if message}<div class="notice">{message}</div>{/if}
     {#if error}<div class="error">{error}</div>{/if}
   </div>
 
@@ -209,26 +195,34 @@
                 <span class="provider-endpoint">{key.keyPrefix}...</span>
               </td>
               <td>
-                <span class={`status-pill ${key.active ? "ok" : "warn"}`}
-                  >{key.active ? "Active" : "Disabled"}</span
-                >
+                <Tag variant={key.active ? "ok" : "warn"}>
+                  {key.active ? "Active" : "Disabled"}
+                </Tag>
               </td>
               <td>{formatTime(key.lastUsedAt)}</td>
               <td>{formatTime(key.createdAt)}</td>
               <td>
                 <div class="table-actions">
-                  <button class="ghost" on:click={() => renameKey(key)}
-                    >Rename</button
-                  >
-                  <button class="ghost" on:click={() => toggleKey(key)}
-                    >{key.active ? "Disable" : "Enable"}</button
-                  >
-                  <button class="alt" on:click={() => rerollKey(key.id)}
-                    >Reroll</button
-                  >
-                  <button class="danger" on:click={() => deleteKey(key.id)}
-                    >Delete</button
-                  >
+                  <Button variant="ghost" on:click={() => renameKey(key)}>
+                    <Icon icon="tabler:pencil" /> Rename
+                  </Button>
+                  <Button variant="ghost" on:click={() => toggleKey(key)}>
+                    {#if key.active}
+                      <span>
+                        <Icon icon="tabler:power" /> Disable
+                      </span>
+                    {:else}
+                      <span>
+                        <Icon icon="tabler:circle-check" /> Enable
+                      </span>
+                    {/if}
+                  </Button>
+                  <Button variant="alt" on:click={() => rerollKey(key.id)}>
+                    <Icon icon="tabler:rotate" /> Reroll
+                  </Button>
+                  <Button variant="danger" on:click={() => deleteKey(key.id)}>
+                    <Icon icon="tabler:trash-x" /> Delete
+                  </Button>
                 </div>
               </td>
             </tr>
@@ -272,8 +266,12 @@
     </p>
 
     <div class="row modal-footer">
-      <button class="ghost" on:click={closeCreateModal}>Close</button>
-      <button on:click|preventDefault={createVirtualKey}>Create Key</button>
+      <Button variant="ghost" on:click={closeCreateModal}>
+        <Icon icon="tabler:x" /> Close
+      </Button>
+      <Button on:click={(e) => { e.preventDefault(); createVirtualKey(); }}>
+        <Icon icon="tabler:key" /> Create Key
+      </Button>
     </div>
   </dialog>
 </main>

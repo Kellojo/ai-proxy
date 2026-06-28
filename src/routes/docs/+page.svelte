@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from "$lib/svelte-components/Icon.svelte";
+
   export let data: { baseUrl: string };
 
   let activeTab = "opencode";
@@ -90,7 +92,15 @@ x-provider-id: PROVIDER_ID`;
             class="copy-btn"
             on:click={() => copyToClipboard(opencodeConfig, "opencode")}
           >
-            {copiedTab["opencode"] ? "Copied!" : "Copy"}
+            {#if copiedTab["opencode"]}
+              <span>
+                <Icon icon="tabler:check" /> Copied!
+              </span>
+            {:else}
+              <span>
+                <Icon icon="tabler:copy" /> Copy
+              </span>
+            {/if}
           </button>
           <pre><code>{opencodeConfig}</code></pre>
         </div>
@@ -101,7 +111,15 @@ x-provider-id: PROVIDER_ID`;
             class="copy-btn"
             on:click={() => copyToClipboard(claudeCodeConfig, "claude")}
           >
-            {copiedTab["claude"] ? "Copied!" : "Copy"}
+            {#if copiedTab["claude"]}
+              <span>
+                <Icon icon="tabler:check" /> Copied!
+              </span>
+            {:else}
+              <span>
+                <Icon icon="tabler:copy" /> Copy
+              </span>
+            {/if}
           </button>
           <pre><code>{claudeCodeConfig}</code></pre>
         </div>
@@ -112,7 +130,15 @@ x-provider-id: PROVIDER_ID`;
             class="copy-btn"
             on:click={() => copyToClipboard(apiExample, "api")}
           >
-            {copiedTab["api"] ? "Copied!" : "Copy"}
+            {#if copiedTab["api"]}
+              <span>
+                <Icon icon="tabler:check" /> Copied!
+              </span>
+            {:else}
+              <span>
+                <Icon icon="tabler:copy" /> Copy
+              </span>
+            {/if}
           </button>
           <pre><code>{apiExample}</code></pre>
         </div>

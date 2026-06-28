@@ -3,6 +3,8 @@
     import { addProvider } from '../providers-store';
     import { createEmptyProviderForm, type ProviderForm as ProviderFormType } from '../types';
     import { onDestroy } from 'svelte';
+    import Button from '$lib/svelte-components/Button.svelte';
+    import Icon from '$lib/svelte-components/Icon.svelte';
 
     export let show: boolean;
     export let onClose: () => void;
@@ -37,7 +39,11 @@
     <ProviderForm bind:formData={form} onFieldChange={() => {}} isEdit={false} />
 
     <div class="modal-footer">
-        <button class="ghost" onclick={closeModal}>Close</button>
-        <button onclick={handleSave}>Save Provider</button>
+        <Button variant="ghost" on:click={closeModal}>
+            <Icon icon="tabler:x" /> Close
+        </Button>
+        <Button on:click={handleSave}>
+            <Icon icon="tabler:key" /> Save Provider
+        </Button>
     </div>
 </dialog>

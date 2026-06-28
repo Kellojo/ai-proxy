@@ -1,5 +1,9 @@
 <script lang="ts">
   import "../app.css";
+  import "../toasts.css";
+  import { Toaster } from "svelte-sonner";
+  import Icon from "$lib/svelte-components/Icon.svelte";
+
   import { page } from "$app/state";
 
   function isActive(path: string) {
@@ -18,18 +22,50 @@
       <span class="version">v{version}</span>
     </div>
     <nav class="nav" aria-label="Primary navigation">
-      <a href="/" class:active={isActive("/")}>Dashboard</a>
+      <a
+        href="/"
+        class:active={isActive("/")}
+        title="Dashboard"
+      >
+        <Icon icon="tabler:layout-dashboard" />
+        Dashboard
+      </a>
 
-      <a href="/providers" class:active={isActive("/providers")}>Providers</a>
-      <a href="/model-mappings" class:active={isActive("/model-mappings")}
-        >Model Mappings</a
+      <a
+        href="/providers"
+        class:active={isActive("/providers")}
+        title="Providers"
       >
-      <a href="/virtual-keys" class:active={isActive("/virtual-keys")}
-        >Virtual Keys</a
+        <Icon icon="tabler:globe" />
+        Providers
+      </a>
+      <a
+        href="/model-mappings"
+        class:active={isActive("/model-mappings")}
+        title="Model Mappings"
       >
-      <a href="/docs" class:active={isActive("/docs")}>Get Started</a>
+        <Icon icon="tabler:shuffle" />
+        Model Mappings
+      </a>
+      <a
+        href="/virtual-keys"
+        class:active={isActive("/virtual-keys")}
+        title="Virtual Keys"
+      >
+        <Icon icon="tabler:key" />
+        Virtual Keys
+      </a>
+      <a
+        href="/docs"
+        class:active={isActive("/docs")}
+        title="Get Started"
+      >
+        <Icon icon="tabler:book" />
+        Get Started
+      </a>
     </nav>
   </div>
 </header>
 
 <slot />
+<Toaster position="bottom-center" toastOptions={{ unstyled: true, class: "toast" }} />

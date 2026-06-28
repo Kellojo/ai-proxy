@@ -1,4 +1,5 @@
-import { writable, get } from "svelte/store";
+import { writable } from "svelte/store";
+import { toast } from "svelte-sonner";
 import type { Provider, ProviderForm } from "./types";
 
 export const MODEL_PREVIEW_MAX_CHARS = 15;
@@ -7,8 +8,6 @@ export const providers = writable<Provider[]>([]);
 export const loadingProviders = writable<boolean>(false);
 export const loadingModels = writable<boolean>(false);
 export const error = writable<string>("");
-export const toast = writable<string>("");
-let toastTimeout: ReturnType<typeof setTimeout> | null = null;
 
 const expandedRows = new Set<string>();
 
@@ -22,15 +21,6 @@ export function toggleProviderModelExpansion(providerId: string): void {
 
 export function isProviderExpanded(providerId: string): boolean {
   return expandedRows.has(providerId);
-}
-
-export function showToast(text: string): void {
-  if (toastTimeout) clearTimeout(toastTimeout);
-  toast.set(text);
-  toastTimeout = setTimeout(() => {
-    toast.set("");
-    toastTimeout = null;
-  }, 1800);
 }
 
 export async function loadProviders() {
@@ -68,7 +58,7 @@ export async function refreshAllModels(): Promise<void> {
       error.set(payload?.error || "Failed to refresh models");
       return;
     }
-    showToast("Models refreshed for all providers");
+    toast.success("Models refreshed for all providers");
     await loadProviders();
   } catch {
     error.set("Failed to refresh models");
@@ -103,7 +93,7 @@ export async function addProvider(formData: ProviderForm) {
     return;
   }
 
-  showToast(`Provider ${payload.provider.name} created`);
+  toast.success(`Provider ${payload.provider.name} created`);
   await refreshProviderData();
 }
 
@@ -130,7 +120,7 @@ export async function saveProviderEdits(id: string, formData: ProviderForm) {
     return;
   }
 
-  showToast(`Provider ${payload.provider.name} updated`);
+  toast.success(`Provider ${payload.provider.name} updated`);
   await refreshProviderData();
 }
 

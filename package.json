@@ -18,11 +18,14 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@iconify-json/tabler": "^1.2.35",
+    "@iconify/svelte": "^5.2.2",
     "@sveltejs/adapter-node": "^5.5.4",
     "@sveltejs/kit": "^2.65.0",
     "better-sqlite3": "^12.10.1",
     "chart.js": "^4.5.1",
-    "svelte": "^5.56.0"
+    "svelte": "^5.56.0",
+    "svelte-sonner": "^1.1.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

@@ -13,3 +13,5 @@
 - Run independent subagents in parallel when possible
 - Keep context clean by never implementing features yourself
 
+## Svelte & UI
+- Use the Svelte 5 runes syntax, where possible.
