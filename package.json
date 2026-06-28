@@ -20,6 +20,7 @@
   "dependencies": {
     "@iconify/json": "^2.2.492",
     "@iconify/svelte": "^5.2.2",
+    "@number-flow/svelte": "^0.4.1",
     "@sveltejs/adapter-node": "^5.5.4",
     "@sveltejs/kit": "^2.65.0",
     "better-sqlite3": "^12.10.1",

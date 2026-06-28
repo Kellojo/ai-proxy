@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
-  import { fade } from "svelte/transition";
+  import NumberFlow from "@number-flow/svelte";
 
   import Tag from "$lib/svelte-components/Tag.svelte";
 
@@ -323,23 +323,36 @@
       <section class="span-12 top-stats" aria-label="Summary statistics">
         <article class="card stack">
           <div class="muted">Total Requests</div>
-          <div class="stat-value">{formatCompact(totalRequests())}</div>
+          <NumberFlow
+            class="stat-value"
+            format={{ notation: "compact" }}
+            value={totalRequests()}
+          />
         </article>
         <article class="card stack">
           <div class="muted">Total Tokens</div>
-          <div class="stat-value">{formatTokens(totalTokens())}</div>
+          <NumberFlow
+            class="stat-value"
+            format={{ notation: "compact" }}
+            value={totalTokens()}
+          />
         </article>
         <article class="card stack">
           <div class="muted">Total Cost</div>
-          <div class="stat-value">{formatCost(totalCost())}</div>
+          <NumberFlow
+            class="stat-value"
+            value={totalCost() ?? 0}
+            locale="en-US"
+            options={{ style: "currency", currency: "USD" }}
+          />
         </article>
         <article class="card stack">
           <div class="muted">Providers in Use</div>
-          <div class="stat-value">{activeProviders()}</div>
+          <NumberFlow class="stat-value" value={activeProviders()} />
         </article>
         <article class="card stack">
           <div class="muted">Models Seen</div>
-          <div class="stat-value">{activeModels()}</div>
+          <NumberFlow class="stat-value" value={activeModels()} />
         </article>
       </section>
     {/if}
