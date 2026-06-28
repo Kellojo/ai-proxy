@@ -75,7 +75,8 @@
     <table class="logs-table entity-table providers-table">
       <thead>
         <tr>
-          <th>Name / Endpoint</th>
+          <th>Name</th>
+          <th>URL</th>
           <th>Kind / Default</th>
           <th>Models</th>
           <th style="width: 10%;">Actions</th>
@@ -86,6 +87,8 @@
           <tr>
             <td>
               <strong>{provider.name}</strong>
+            </td>
+            <td>
               <div class="provider-endpoint" title={provider.endpointUrl}>
                 {provider.endpointUrl}
               </div>
