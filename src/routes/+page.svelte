@@ -341,9 +341,13 @@
           <div class="muted">Total Cost</div>
           <NumberFlow
             class="stat-value"
+            format={{
+              style: "currency",
+              currency: "USD",
+              trailingZeroDisplay: "stripIfInteger",
+            }}
             value={totalCost() ?? 0}
             locale="en-US"
-            options={{ style: "currency", currency: "USD" }}
           />
         </article>
         <article class="card stack">

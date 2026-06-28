@@ -244,6 +244,7 @@ async function handleAuthenticatedRequest(params: {
           promptTokens: usage.promptTokens || undefined,
           completionTokens: usage.completionTokens || undefined,
           totalTokens: usage.totalTokens || undefined,
+          cost: usage.cost ?? undefined,
         });
 
         return new Response(responseText, {
