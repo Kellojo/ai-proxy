@@ -86,6 +86,12 @@ export function extractOpenAIUsageMetrics(payload: any): UsageMetrics {
     readNumericValue(payload?.total_cost) ??
     readNumericValue(usage?.cost_details?.upstream_inference_cost);
 
+  try {
+    if (cost == undefined) {
+      console.log(`Could not extract cost from: ${JSON.stringify(payload)}`);
+    }
+  } catch (e) {}
+
   return { promptTokens, completionTokens, totalTokens, cost };
 }
 
@@ -120,8 +126,7 @@ export function returnResponse(
         status: statusCode,
         headers: {
           "content-type": upstreamContentType,
-          "cache-control":
-            upstream.headers.get("cache-control") || "no-cache",
+          "cache-control": upstream.headers.get("cache-control") || "no-cache",
           connection: upstream.headers.get("connection") || "keep-alive",
         },
       }),
