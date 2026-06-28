@@ -303,10 +303,10 @@ async function handleAuthenticatedRequest(params: {
   );
 }
 
-async function aggregateStreamUsage(responseText: string): Promise<{ promptTokens: number; completionTokens: number; totalTokens: number }> {
+async function aggregateStreamUsage(responseText: string): Promise<{ promptTokens: number; completionTokens: number; totalTokens: number; cost?: number }> {
   const lines = responseText.split("\n").filter(l => l.startsWith("data:"));
 
-  let promptTokens = 0, completionTokens = 0, totalTokens = 0;
+  let promptTokens = 0, completionTokens = 0, totalTokens = 0, cost: number | undefined;
 
   for (const line of lines) {
     const data = line.slice(5).trim();
@@ -318,10 +318,16 @@ async function aggregateStreamUsage(responseText: string): Promise<{ promptToken
       if (usage?.prompt_tokens != null) promptTokens += Number(usage.prompt_tokens);
       if (usage?.completion_tokens != null) completionTokens += Number(usage.completion_tokens);
       if (usage?.total_tokens != null) totalTokens += Number(usage.total_tokens);
+      if (usage?.cost != null && cost === undefined) {
+        cost = 0;
+      }
+      if (usage?.cost != null) {
+        cost! += Number(usage.cost);
+      }
     } catch { /* ignore malformed chunks */ }
   }
 
-  return { promptTokens, completionTokens, totalTokens };
+  return { promptTokens, completionTokens, totalTokens, cost };
 }
 
 async function processResponse(
@@ -345,6 +351,7 @@ async function processResponse(
       promptTokens: usage.promptTokens || undefined,
       completionTokens: usage.completionTokens || undefined,
       totalTokens: usage.totalTokens || undefined,
+      cost: usage.cost ?? undefined,
     });
 
     return new Response(responseText, {

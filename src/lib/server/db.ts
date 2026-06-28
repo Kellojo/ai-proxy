@@ -543,7 +543,7 @@ export function getStats() {
 
   const recentRequests = db
     .prepare(
-      `SELECT r.created_at, r.status_code, r.model, r.duration_ms, r.prompt_tokens, r.completion_tokens, r.total_tokens, r.cost, r.remapped_model, r.virtual_key_id, COALESCE(vk.name, 'Unauthenticated') AS key_name, COALESCE(p.name, '—') AS provider_name FROM request_logs r LEFT JOIN providers p ON p.id = r.provider_id LEFT JOIN virtual_keys vk ON vk.id = r.virtual_key_id ORDER BY r.created_at DESC LIMIT 50`,
+      `SELECT r.id, r.created_at, r.status_code, r.model, r.duration_ms, r.prompt_tokens, r.completion_tokens, r.total_tokens, r.cost, r.remapped_model, r.virtual_key_id, COALESCE(vk.name, 'Unauthenticated') AS key_name, COALESCE(p.name, '—') AS provider_name FROM request_logs r LEFT JOIN providers p ON p.id = r.provider_id LEFT JOIN virtual_keys vk ON vk.id = r.virtual_key_id ORDER BY r.created_at DESC LIMIT 50`,
     )
     .all();
 

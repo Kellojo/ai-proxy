@@ -23,6 +23,8 @@
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
   let chartTimer: ReturnType<typeof setInterval> | null = null;
   let loadingStats = false;
+  let prevRequestIds = new Set<string>();
+  let prevActiveKeys = new Set<string>();
 
   const LIVE_REFRESH_MS = 1000;
   const MAX_BUCKETS = 50;
@@ -117,6 +119,13 @@
 
   function activeModels() {
     return stats?.modelUsage?.length || 0;
+  }
+
+  function activeKey(active: any) {
+    const provider = (active.providerName ?? "").toLowerCase();
+    const model = (active.model ?? "").toLowerCase();
+    const started = String(active.startedAt ?? "");
+    return `${provider}::${model}::${started}`;
   }
 
   async function ensureChartLib() {
@@ -249,12 +258,32 @@
       const statsRes = await fetch("/api/stats");
       if (!statsRes.ok) return;
 
-      stats = await statsRes.json();
+      const newStats = await statsRes.json();
+      const currentIds = new Set<string>();
+      for (const row of newStats.recentRequests ?? []) {
+        if (row.id) currentIds.add(row.id);
+      }
+      const newlyAdded = new Set<string>();
+      for (const id of currentIds) {
+        if (!prevRequestIds.has(id)) newlyAdded.add(id);
+      }
+      prevRequestIds = currentIds;
+
+      stats = newStats;
       await tick();
       await renderTimelineChart();
+
+      // Remove the "new" highlight once the animation has finished.
+      setTimeout(() => {
+        for (const id of newlyAdded) prevRequestIds.add(id + "_done");
+      }, 400);
     } finally {
       loadingStats = false;
     }
+  }
+
+  function isNewRow(id: string): boolean {
+    return !prevRequestIds.has(id) && !prevRequestIds.has(id + "_done");
   }
 
   function startTimers() {
@@ -372,8 +401,8 @@
               </tr>
             </thead>
             <tbody>
-              {#each stats.activeRequests as active}
-                <tr class="running-row">
+              {#each stats.activeRequests as active (activeKey(active))}
+                <tr class="running-row" data-new={isNewRow(String(active.startedAt + active.providerName + active.model))}>
                   <td class="active-cell">
                     <div class="cell-stack">
                       <div>{active.virtualKey || "—"}</div>
@@ -413,8 +442,8 @@
                   </td>
                 </tr>
               {/each}
-              {#each stats.recentRequests as row}
-                <tr>
+              {#each stats.recentRequests as row (row.id)}
+                <tr data-new={isNewRow(row.id)}>
                   <td>
                     <div class="cell-stack">
                       <div>{row.key_name}</div>
@@ -460,3 +489,21 @@
     </div>
   </div>
 </main>
+
+<style>
+  @keyframes row-in {
+    from {
+      opacity: 0;
+      transform: scaleY(0.6);
+    }
+    to {
+      opacity: 1;
+      transform: scaleY(1);
+    }
+  }
+
+  tr[data-new] {
+    animation: row-in 300ms ease-out forwards;
+    transform-origin: top center;
+  }
+</style>
