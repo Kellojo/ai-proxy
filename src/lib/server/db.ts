@@ -630,25 +630,23 @@ export function createOrUpdateModelMapping(
       usedId = randomUUID();
     } else {
       // Update in place (same source_model or same new source_model)
-      usedId = existingId;
+      db.prepare(
+        `UPDATE model_mappings SET source_model = ?, target_model = ?, provider_id = ? WHERE id = ?`,
+      ).run(trimmedSource, trimmedTarget, providerId || null, existingId);
+
+      const row = db
+        .prepare("SELECT * FROM model_mappings WHERE id = ?")
+        .get(existingId);
+
+      return row ? mapModelMapping(row) : undefined;
     }
-
-    db.prepare(
-      `INSERT INTO model_mappings (id, source_model, target_model, provider_id) VALUES (?, ?, ?, ?)`,
-    ).run(usedId, trimmedSource, trimmedTarget, providerId || null);
-
-    const row = db
-      .prepare("SELECT * FROM model_mappings WHERE id = ?")
-      .get(usedId);
-
-    return row ? mapModelMapping(row) : undefined;
   }
 
   // Create path: INSERT OR REPLACE so existing source_model is overwritten
   const id = randomUUID();
 
   db.prepare(
-    `INSERT INTO model_mappings (id, source_model, target_model, provider_id) VALUES (?, ?, ?, ?)`,
+    `INSERT OR REPLACE INTO model_mappings (id, source_model, target_model, provider_id) VALUES (?, ?, ?, ?)`,
   ).run(id, trimmedSource, trimmedTarget, providerId || null);
 
   const row = db
