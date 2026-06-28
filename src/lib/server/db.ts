@@ -118,12 +118,12 @@ if (!hasRequestLogColumn("cost")) {
 }
 
 if (!hasRequestLogColumn("remapped_model")) {
-  db.exec(
-    "ALTER TABLE request_logs ADD COLUMN remapped_model TEXT DEFAULT ''",
-  );
+  db.exec("ALTER TABLE request_logs ADD COLUMN remapped_model TEXT DEFAULT ''");
 }
 
-const modelMappingsColumns = db.prepare("PRAGMA table_info(model_mappings)").all() as Array<{ name: string }>;
+const modelMappingsColumns = db
+  .prepare("PRAGMA table_info(model_mappings)")
+  .all() as Array<{ name: string }>;
 if (!modelMappingsColumns.some((col) => col.name === "provider_id")) {
   db.exec("ALTER TABLE model_mappings ADD COLUMN provider_id TEXT");
 }
@@ -205,7 +205,9 @@ export function validateProviderInput(
   }
 
   if (!["openai", "openrouter", "openai-compatible"].includes(value.kind)) {
-    throw new Error("kind must be one of: openai, openrouter, openai-compatible");
+    throw new Error(
+      "kind must be one of: openai, openrouter, openai-compatible",
+    );
   }
 
   return {
@@ -229,7 +231,15 @@ export function createProvider(input: ProviderInput): Provider {
     db.prepare(
       `INSERT INTO providers (id, name, kind, endpoint_url, api_key, is_default, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run(id, input.name, input.kind, input.endpointUrl, input.apiKey, input.isDefault ? 1 : 0, createdAt);
+    ).run(
+      id,
+      input.name,
+      input.kind,
+      input.endpointUrl,
+      input.apiKey,
+      input.isDefault ? 1 : 0,
+      createdAt,
+    );
   });
 
   tx();
@@ -256,7 +266,15 @@ export function updateProvider(
     db.prepare(
       `UPDATE providers SET
        name = ?, kind = ?, endpoint_url = ?, api_key = ?, is_default = ?, created_at = ? WHERE id = ?`,
-    ).run(input.name, input.kind, input.endpointUrl, nextApiKey, input.isDefault ? 1 : 0, existing.createdAt, id);
+    ).run(
+      input.name,
+      input.kind,
+      input.endpointUrl,
+      nextApiKey,
+      input.isDefault ? 1 : 0,
+      existing.createdAt,
+      id,
+    );
   });
 
   tx();
@@ -271,8 +289,12 @@ export function deleteProvider(id: string): boolean {
 
 // ── Provider Models ──────────────────────────────────────────────────────
 
-export function getProviderModelIds(providerId: string): { modelIds: string[]; lastUpdated: string | null } | undefined {
-  const row = db.prepare("SELECT * FROM provider_models WHERE provider_id = ?").get(providerId) as any;
+export function getProviderModelIds(
+  providerId: string,
+): { modelIds: string[]; lastUpdated: string | null } | undefined {
+  const row = db
+    .prepare("SELECT * FROM provider_models WHERE provider_id = ?")
+    .get(providerId) as any;
   if (!row) return undefined;
 
   let modelIds: string[] = [];
@@ -285,7 +307,10 @@ export function getProviderModelIds(providerId: string): { modelIds: string[]; l
   return { modelIds, lastUpdated: row.last_updated || null };
 }
 
-export function saveProviderModelIds(providerId: string, modelIds: string[]): void {
+export function saveProviderModelIds(
+  providerId: string,
+  modelIds: string[],
+): void {
   const id = randomUUID();
   const now = new Date().toISOString();
 
@@ -295,19 +320,41 @@ export function saveProviderModelIds(providerId: string, modelIds: string[]): vo
   ).run(id, providerId, JSON.stringify(modelIds), now);
 }
 
-let cachedProviderModelIds: Map<string, { modelIds: string[]; lastUpdated: string | null }> | null = null;
+let cachedProviderModelIds: Map<
+  string,
+  { modelIds: string[]; lastUpdated: string | null }
+> | null = null;
 
-export function getProvidersWithModels(): Array<{ id: string; name: string; modelIds: string[]; lastUpdated: string | null }> {
-  const rows = db.prepare(
-    "SELECT p.id, p.name, pm.model_ids_json, pm.last_updated FROM providers p LEFT JOIN provider_models pm ON pm.provider_id = p.id ORDER BY p.created_at DESC",
-  ).all() as Array<{ id: string; name: string; model_ids_json: string | null; last_updated: string | null }>;
+export function getProvidersWithModels(): Array<{
+  id: string;
+  name: string;
+  modelIds: string[];
+  lastUpdated: string | null;
+}> {
+  const rows = db
+    .prepare(
+      "SELECT p.id, p.name, pm.model_ids_json, pm.last_updated FROM providers p LEFT JOIN provider_models pm ON pm.provider_id = p.id ORDER BY p.created_at DESC",
+    )
+    .all() as Array<{
+    id: string;
+    name: string;
+    model_ids_json: string | null;
+    last_updated: string | null;
+  }>;
 
-  return rows.map(row => {
+  return rows.map((row) => {
     let modelIds: string[] = [];
     try {
       if (row.model_ids_json) modelIds = JSON.parse(row.model_ids_json);
-    } catch { /* ignore */ }
-    return { id: row.id, name: row.name, modelIds, lastUpdated: row.last_updated };
+    } catch {
+      /* ignore */
+    }
+    return {
+      id: row.id,
+      name: row.name,
+      modelIds,
+      lastUpdated: row.last_updated,
+    };
   });
 }
 
@@ -427,7 +474,10 @@ export function authenticateVirtualKey(
   if (!row) return undefined;
 
   const now = new Date().toISOString();
-  db.prepare("UPDATE virtual_keys SET last_used_at = ? WHERE id = ?").run(now, row.id);
+  db.prepare("UPDATE virtual_keys SET last_used_at = ? WHERE id = ?").run(
+    now,
+    row.id,
+  );
   row.last_used_at = now;
 
   return mapVirtualKey(row);
@@ -497,7 +547,13 @@ export function getStats() {
     )
     .all();
 
-  return { summary, providerUsage, modelUsage, requestsTimeline, recentRequests };
+  return {
+    summary,
+    providerUsage,
+    modelUsage,
+    requestsTimeline,
+    recentRequests,
+  };
 }
 
 // ── Model Migrations ──────────────────────────────────────────────────────
@@ -541,28 +597,63 @@ function mapModelMapping(row: any): ModelMapping {
 
 export function listModelMappings(): ModelMapping[] {
   const rows = db
-    .prepare(
-      "SELECT * FROM model_mappings ORDER BY source_model ASC",
-    )
+    .prepare("SELECT * FROM model_mappings ORDER BY source_model ASC")
     .all();
   return rows.map(mapModelMapping);
 }
 
-export function createOrUpdateModelMapping(sourceModel: string, targetModel: string, providerId?: string): ModelMapping | undefined {
+export function createOrUpdateModelMapping(
+  sourceModel: string,
+  targetModel: string,
+  providerId?: string,
+  existingId?: string,
+): ModelMapping | undefined {
   if (!sourceModel.trim() || !targetModel.trim()) {
     throw new Error("source_model and target_model are required");
   }
 
+  const trimmedSource = sourceModel.trim();
+  const trimmedTarget = targetModel.trim();
+
+  // Check whether an existing row is being renamed (different source_model)
+  if (existingId) {
+    const existing = db.prepare("SELECT * FROM model_mappings WHERE id = ?").get(existingId) as { id: string; source_model: string } | undefined;
+
+    let usedId: string;
+
+    if (existing && existing.source_model !== trimmedSource) {
+      // Rename: remove the old row, then insert with its original id preserved
+      usedId = existing.id!;
+      db.prepare("DELETE FROM model_mappings WHERE id = ?").run(existingId);
+    } else if (!existing) {
+      // Id refers to a non-existent row — treat as new mapping
+      usedId = randomUUID();
+    } else {
+      // Update in place (same source_model or same new source_model)
+      usedId = existingId;
+    }
+
+    db.prepare(
+      `INSERT INTO model_mappings (id, source_model, target_model, provider_id) VALUES (?, ?, ?, ?)`,
+    ).run(usedId, trimmedSource, trimmedTarget, providerId || null);
+
+    const row = db
+      .prepare("SELECT * FROM model_mappings WHERE id = ?")
+      .get(usedId);
+
+    return row ? mapModelMapping(row) : undefined;
+  }
+
+  // Create path: INSERT OR REPLACE so existing source_model is overwritten
   const id = randomUUID();
 
   db.prepare(
-    `INSERT INTO model_mappings (id, source_model, target_model, provider_id) VALUES (?, ?, ?, ?)
-     ON CONFLICT(source_model) DO UPDATE SET target_model = excluded.target_model, provider_id = excluded.provider_id`,
-  ).run(id, sourceModel.trim(), targetModel.trim(), providerId || null);
+    `INSERT INTO model_mappings (id, source_model, target_model, provider_id) VALUES (?, ?, ?, ?)`,
+  ).run(id, trimmedSource, trimmedTarget, providerId || null);
 
   const row = db
-    .prepare("SELECT * FROM model_mappings WHERE source_model = ?")
-    .get(sourceModel.trim());
+    .prepare("SELECT * FROM model_mappings WHERE id = ?")
+    .get(id);
 
   return row ? mapModelMapping(row) : undefined;
 }
@@ -572,9 +663,15 @@ export function deleteModelMapping(id: string): boolean {
   return result.changes > 0;
 }
 
-let cachedMappings: Map<string, { target: string; providerId?: string }> | null = null;
+let cachedMappings: Map<
+  string,
+  { target: string; providerId?: string }
+> | null = null;
 
-function getMappingCache(): Map<string, { target: string; providerId?: string }> {
+function getMappingCache(): Map<
+  string,
+  { target: string; providerId?: string }
+> {
   if (!cachedMappings) {
     cachedMappings = new Map();
     const mappings = listModelMappings();
@@ -588,12 +685,16 @@ function getMappingCache(): Map<string, { target: string; providerId?: string }>
   return cachedMappings;
 }
 
-export function resolveModelMapping(model: string): { target: string; providerId?: string } | undefined {
+export function resolveModelMapping(
+  model: string,
+): { target: string; providerId?: string } | undefined {
   const cache = getMappingCache();
   const lower = model.toLowerCase().trim();
   if (cache.has(lower)) {
     const entry = cache.get(lower)!;
-    console.log(`[ai-proxy] Model remap: "${model}" -> "${entry.target}"${entry.providerId ? ` (provider: ${entry.providerId})` : ""}`);
+    console.log(
+      `[ai-proxy] Model remap: "${model}" -> "${entry.target}"${entry.providerId ? ` (provider: ${entry.providerId})` : ""}`,
+    );
     return entry;
   }
   return undefined;
@@ -618,7 +719,7 @@ if (!tableExists("provider_models")) {
 
 const MODEL_REFRESH_INTERVAL_MS = (() => {
   const raw = process.env.MODEL_LIST_REFRESH_INTERVAL_MS;
-  if (!raw) return 60 * 60 * 1000; // default: 1 hour
+  if (!raw) return 7 * 24 * 60 * 60 * 1000; // default: 1 week
   const parsed = Number.parseInt(raw, 10);
   if (Number.isFinite(parsed) && parsed > 0) return parsed;
   return 60 * 60 * 1000;
@@ -629,13 +730,18 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null;
 export function startModelRefreshTimer(): void {
   if (refreshTimer) clearInterval(refreshTimer);
 
-  console.log(`[ai-proxy] Model list auto-refresh interval set to ${MODEL_REFRESH_INTERVAL_MS}ms (${Math.round(MODEL_REFRESH_INTERVAL_MS / 60000)} min)`);
+  console.log(
+    `[ai-proxy] Model list auto-refresh interval set to ${MODEL_REFRESH_INTERVAL_MS}ms (${Math.round(MODEL_REFRESH_INTERVAL_MS / 60000)} min)`,
+  );
 
   refreshTimer = setInterval(async () => {
     try {
       await fetchAndSaveAllProviderModels();
     } catch (error: any) {
-      console.error("[ai-proxy] Error during periodic model refresh:", error?.message || "Unknown error");
+      console.error(
+        "[ai-proxy] Error during periodic model refresh:",
+        error?.message || "Unknown error",
+      );
     }
   }, MODEL_REFRESH_INTERVAL_MS);
 
@@ -644,7 +750,10 @@ export function startModelRefreshTimer(): void {
     try {
       await fetchAndSaveAllProviderModels();
     } catch (error: any) {
-      console.error("[ai-proxy] Error during initial model refresh:", error?.message || "Unknown error");
+      console.error(
+        "[ai-proxy] Error during initial model refresh:",
+        error?.message || "Unknown error",
+      );
     }
   }, 5000);
 }
@@ -656,28 +765,41 @@ export function stopModelRefreshTimer(): void {
   }
 }
 
-export async function fetchAndSaveProviderModels(provider: any): Promise<{ ok: boolean; modelIds: string[] }> {
+export async function fetchAndSaveProviderModels(
+  provider: any,
+): Promise<{ ok: boolean; modelIds: string[] }> {
   const { forwardModelList } = await import("$lib/server/proxy");
   try {
     const upstream = await forwardModelList(provider);
     const text = await upstream.text();
 
     if (!upstream.ok) {
-      console.log(`[ai-proxy] Model refresh failed for "${provider.name}": HTTP ${upstream.status}`);
+      console.log(
+        `[ai-proxy] Model refresh failed for "${provider.name}": HTTP ${upstream.status}`,
+      );
       return { ok: false, modelIds: [] };
     }
 
     const payload = JSON.parse(text);
-    const models = Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.models) ? payload.models : [];
+    const models = Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload?.models)
+        ? payload.models
+        : [];
     const modelIds = models
       .filter((m: any) => typeof m?.id === "string" && m.id.length > 0)
       .map((m: any) => m.id);
 
     saveProviderModelIds(provider.id, modelIds);
-    console.log(`[ai-proxy] Saved ${modelIds.length} model(s) for provider "${provider.name}" (id: ${provider.id})`);
+    console.log(
+      `[ai-proxy] Saved ${modelIds.length} model(s) for provider "${provider.name}" (id: ${provider.id})`,
+    );
     return { ok: true, modelIds };
   } catch (error: any) {
-    console.error(`[ai-proxy] Error fetching models for "${provider.name}":`, error?.message || "Unknown error");
+    console.error(
+      `[ai-proxy] Error fetching models for "${provider.name}":`,
+      error?.message || "Unknown error",
+    );
     return { ok: false, modelIds: [] };
   }
 }
@@ -686,7 +808,9 @@ export async function fetchAndSaveAllProviderModels(): Promise<void> {
   const providers = listProviders();
   if (providers.length === 0) return;
 
-  console.log(`[ai-proxy] Refreshing models for ${providers.length} provider(s)...`);
+  console.log(
+    `[ai-proxy] Refreshing models for ${providers.length} provider(s)...`,
+  );
 
-  await Promise.all(providers.map(p => fetchAndSaveProviderModels(p)));
+  await Promise.all(providers.map((p) => fetchAndSaveProviderModels(p)));
 }

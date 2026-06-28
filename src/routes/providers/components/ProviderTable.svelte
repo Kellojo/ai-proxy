@@ -10,6 +10,7 @@
   import type { Provider } from "../types";
 
   import Button from "$lib/svelte-components/Button.svelte";
+  import Dropdown from "$lib/svelte-components/Dropdown.svelte";
   import Tag from "$lib/svelte-components/Tag.svelte";
   import Icon from "$lib/svelte-components/Icon.svelte";
 
@@ -19,7 +20,8 @@
     onCreateProvider: () => void;
   }
 
-  const { onEditProvider, onDeleteProvider, onCreateProvider } = $props<Props>();
+  const { onEditProvider, onDeleteProvider, onCreateProvider } =
+    $props<Props>();
 
   function formatLastRefresh(timestamp?: string | null): string {
     if (!timestamp) return "-";
@@ -47,9 +49,7 @@
   <div class="page-header">
     <div class="stack" style="gap: 0.2rem;">
       <h1>Providers</h1>
-      <p class="muted">
-        Configure OpenAI-compatible providers.
-      </p>
+      <p class="muted">Configure OpenAI-compatible providers.</p>
     </div>
     <div class="stack" style="display: flex; flex-direction: row; gap: 0.5rem;">
       {#if !$loadingModels}
@@ -78,12 +78,12 @@
           <th>Name / Endpoint</th>
           <th>Kind / Default</th>
           <th>Models</th>
-          <th>Actions</th>
+          <th style="width: 10%;">Actions</th>
         </tr>
       </thead>
       <tbody>
-          {#each $providers as provider}
-            <tr>
+        {#each $providers as provider}
+          <tr>
             <td>
               <strong>{provider.name}</strong>
               <div class="provider-endpoint" title={provider.endpointUrl}>
@@ -94,7 +94,7 @@
               <span class="kind-chip">{provider.kind}</span>
               {#if provider.isDefault}
                 <div style="margin-top: 0.35rem;">
-                <Tag variant="ok">Default</Tag>
+                  <Tag variant="ok">Default</Tag>
                 </div>
               {:else}
                 <div class="muted" style="margin-top: 0.35rem;">
@@ -105,27 +105,36 @@
             <td>
               <div class="models-cell" title={modelTooltip(provider.modelIds)}>
                 {#if provider.modelCount && provider.modelCount > 0}
-                  {provider.modelCount} model{provider.modelCount === 1 ? "" : "s"}
+                  {provider.modelCount} model{provider.modelCount === 1
+                    ? ""
+                    : "s"}
                 {:else}
                   No data
                 {/if}
               </div>
-              <div class="muted" style="font-size: 0.78rem; margin-top: 0.25rem;">
+              <div
+                class="muted"
+                style="font-size: 0.78rem; margin-top: 0.25rem;"
+              >
                 {formatLastRefresh(provider.lastModelRefreshAt)}
               </div>
             </td>
             <td>
-              <div class="table-actions">
-                <Button variant="ghost" on:click={() => onEditProvider(provider)}>
-                  <Icon icon="tabler:pencil" /> Edit
-                </Button>
-                <Button
-                  variant="danger"
-                  on:click={() => onDeleteProvider(provider.id)}
-                >
-                  <Icon icon="tabler:trash-x" /> Delete
-                </Button>
-              </div>
+              <Dropdown
+                items={[
+                  {
+                    label: "Edit",
+                    icon: "tabler:pencil",
+                    action: () => onEditProvider(provider),
+                  },
+                  {
+                    label: "Delete",
+                    icon: "tabler:trash-x",
+                    variant: "danger",
+                    action: () => onDeleteProvider(provider.id),
+                  },
+                ]}
+              />
             </td>
           </tr>
         {/each}

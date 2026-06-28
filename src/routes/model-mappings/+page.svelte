@@ -4,6 +4,7 @@
   import Icon from "$lib/svelte-components/Icon.svelte";
 
   import Button from "$lib/svelte-components/Button.svelte";
+  import Dropdown from "$lib/svelte-components/Dropdown.svelte";
   import Tag from "$lib/svelte-components/Tag.svelte";
 
   type ModelMapping = {
@@ -221,7 +222,7 @@
             <th style="width: 25%;">Source Model (alias)</th>
             <th style="width: 30%;">Target Model (real name)</th>
             <th style="width: 25%;">Provider</th>
-            <th style="width: 20%;">Actions</th>
+            <th style="width: 10%;">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -295,17 +296,10 @@
                   {/if}
                 </td>
                 <td>
-                  <div class="table-actions">
-                    <Button variant="ghost" on:click={() => startEdit(mapping)}>
-                      <Icon icon="tabler:pencil" /> Edit
-                    </Button>
-                    <Button
-                      variant="danger"
-                      on:click={() => removeMapping(mapping.id, mapping.sourceModel)}
-                    >
-                      <Icon icon="tabler:trash-x" /> Delete
-                    </Button>
-                  </div>
+                  <Dropdown items={[
+                    { label: "Edit", icon: "tabler:pencil", action: () => startEdit(mapping) },
+                    { label: "Delete", icon: "tabler:trash-x", variant: "danger", action: () => removeMapping(mapping.id, mapping.sourceModel) }
+                  ]} />
                 </td>
               </tr>
             {/if}

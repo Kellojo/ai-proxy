@@ -19,7 +19,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
     }
 
     invalidateModelMappingCache();
-    const mapping = createOrUpdateModelMapping(sourceModel, targetModel, providerId);
+    const mapping = createOrUpdateModelMapping(sourceModel, targetModel, providerId, params.id);
     return json({ ok: true, mapping });
   } catch (error: any) {
     return json({ error: error.message || "Invalid request" }, { status: 400 });

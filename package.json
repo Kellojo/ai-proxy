@@ -18,7 +18,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@iconify-json/tabler": "^1.2.35",
+    "@iconify/json": "^2.2.492",
     "@iconify/svelte": "^5.2.2",
     "@sveltejs/adapter-node": "^5.5.4",
     "@sveltejs/kit": "^2.65.0",

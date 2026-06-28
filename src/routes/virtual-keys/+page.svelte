@@ -3,7 +3,9 @@
   import { toast } from "svelte-sonner";
   import Icon from "$lib/svelte-components/Icon.svelte";
 
+  import { formatTimeAgo } from "$lib/helpers";
   import Button from "$lib/svelte-components/Button.svelte";
+  import Dropdown from "$lib/svelte-components/Dropdown.svelte";
   import Tag from "$lib/svelte-components/Tag.svelte";
 
   type VirtualKey = {
@@ -24,12 +26,6 @@
   let createModalClosing = false;
 
   let createDialog: HTMLDialogElement | null = null;
-
-  function formatTime(value?: string) {
-    if (!value) return "-";
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
-  }
 
   async function loadKeys() {
     const response = await fetch("/api/virtual-keys");
@@ -184,11 +180,11 @@
             <th>Status</th>
             <th>Last Used</th>
             <th>Created</th>
-            <th>Actions</th>
+            <th style="width: 10%;">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {#each keys as key}
+          {#each keys as key (key.id)}
             <tr>
               <td><strong>{key.name}</strong></td>
               <td>
@@ -199,31 +195,36 @@
                   {key.active ? "Active" : "Disabled"}
                 </Tag>
               </td>
-              <td>{formatTime(key.lastUsedAt)}</td>
-              <td>{formatTime(key.createdAt)}</td>
+              <td>{formatTimeAgo(key.lastUsedAt ?? "")}</td>
+              <td>{formatTimeAgo(key.createdAt)}</td>
               <td>
-                <div class="table-actions">
-                  <Button variant="ghost" on:click={() => renameKey(key)}>
-                    <Icon icon="tabler:pencil" /> Rename
-                  </Button>
-                  <Button variant="ghost" on:click={() => toggleKey(key)}>
-                    {#if key.active}
-                      <span>
-                        <Icon icon="tabler:power" /> Disable
-                      </span>
-                    {:else}
-                      <span>
-                        <Icon icon="tabler:circle-check" /> Enable
-                      </span>
-                    {/if}
-                  </Button>
-                  <Button variant="alt" on:click={() => rerollKey(key.id)}>
-                    <Icon icon="tabler:rotate" /> Reroll
-                  </Button>
-                  <Button variant="danger" on:click={() => deleteKey(key.id)}>
-                    <Icon icon="tabler:trash-x" /> Delete
-                  </Button>
-                </div>
+                <Dropdown
+                  items={[
+                    {
+                      label: "Rename",
+                      icon: "tabler:pencil",
+                      action: () => renameKey(key),
+                    },
+                    {
+                      label: key.active ? "Disable" : "Enable",
+                      icon: "tabler:power",
+                      variant: "default",
+                      action: () => toggleKey(key),
+                    },
+                    {
+                      label: "Reroll",
+                      icon: "tabler:refresh",
+                      variant: "alt",
+                      action: () => rerollKey(key.id),
+                    },
+                    {
+                      label: "Delete",
+                      icon: "tabler:trash",
+                      variant: "danger",
+                      action: () => deleteKey(key.id),
+                    },
+                  ]}
+                />
               </td>
             </tr>
           {/each}
@@ -269,7 +270,12 @@
       <Button variant="ghost" on:click={closeCreateModal}>
         <Icon icon="tabler:x" /> Close
       </Button>
-      <Button on:click={(e) => { e.preventDefault(); createVirtualKey(); }}>
+      <Button
+        on:click={(e) => {
+          e.preventDefault();
+          createVirtualKey();
+        }}
+      >
         <Icon icon="tabler:key" /> Create Key
       </Button>
     </div>
