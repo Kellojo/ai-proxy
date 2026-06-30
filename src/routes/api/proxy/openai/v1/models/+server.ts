@@ -1,11 +1,11 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
+import { readProviderId } from "$lib/server/common-server";
 import {
   authenticateVirtualKey,
   getProvider,
   listProviders,
   logRequest,
-  resolveModelMapping,
 } from "$lib/server/db";
 import { extractBearer } from "$lib/server/keys";
 import { forwardModelList } from "$lib/server/proxy";
@@ -158,13 +158,4 @@ async function fetchProviderModels(
       error: error?.message || "Unknown proxy error",
     };
   }
-}
-
-function readProviderId(request: Request): string | undefined {
-  return (
-    request.headers.get("x-provider-id") ||
-    request.headers.get("x-ai-provider-id") ||
-    new URL(request.url).searchParams.get("providerId") ||
-    undefined
-  );
 }

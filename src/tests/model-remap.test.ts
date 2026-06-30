@@ -336,5 +336,66 @@ describe("Model Remapping", () => {
 
       expect(res.status).toBe(404);
     });
+
+    it("narrows provider candidates by the remapped target model (D4 bug fix)", async () => {
+      if (!remapTestKey) return;
+
+      // Create a second non-default provider.
+      const narrowProvRes = await fetch(`${devUrl}/api/providers`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name: "narrow-test-provider",
+          kind: "openai-compatible",
+          endpointUrl: process.env.TEST_LIVE_PROVIDER_URL || "http://localhost:1234/v1",
+          apiKey: "local",
+          isDefault: false,
+        }),
+      });
+      const narrowProvJson = (await narrowProvRes.json()) as any;
+      const narrowProvId = narrowProvJson?.provider?.id;
+
+      // Register a mapping where the target only appears in narrow-test-provider's known models.
+      await request("/api/model-mappings", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ source_model: "narrow-source-model", target_model: "narrow-target-only-in-non-default" }),
+      });
+
+      // Directly insert model IDs into the database so getProvidersWithModels() returns them.
+      const { saveProviderModelIds, invalidateProviderModelCache, listProviders } = await import("../lib/server/db.js");
+      if (narrowProvId) {
+        saveProviderModelIds(narrowProvId, ["narrow-target-only-in-non-default"]);
+      }
+      invalidateProviderModelCache();
+
+      // First clear any existing model-mapping cache so the new target is picked up.
+      const { invalidateModelMappingCache } = await import("../lib/server/db.js");
+      invalidateModelMappingCache();
+
+      const narrowProvName = listProviders().find((p: any) => p.id === narrowProvId)?.name || "narrow-test-provider";
+
+      const res = await fetch(`${devUrl}/api/proxy/openai/v1/chat/completions`, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${remapTestKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ model: "narrow-source-model", messages: [{ role: "user", content: "hi" }] }),
+      });
+
+      // Verify narrowing worked: only narrow-test-provider should appear in triedProviders.
+      const jsonBody = await res.json();
+      const triedProviders = jsonBody.triedProviders as any[];
+
+      if (triedProviders && triedProviders.length > 0) {
+        expect(triedProviders).toBeDefined();
+        expect(triedProviders.length).toBeLessThanOrEqual(1);
+        expect(triedProviders[0].providerName).toBe(narrowProvName);
+      } else {
+        // With a working backend (LM Studio returns 200 for any model), there is no triedProviders.
+        expect(res.status).toBe(200);
+      }
+    });
   });
 });

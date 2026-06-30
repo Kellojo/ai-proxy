@@ -34,5 +34,17 @@ export function finishRequest(id: string): void {
 
 /** Snapshot of all currently-active requests, newest first. */
 export function listActive(): ActiveRequest[] {
-  return Array.from(active.values()).sort((a, b) => b.startedAt - a.startedAt);
+  return Array.from(active.values()).sort((a: ActiveRequest, b: ActiveRequest) => b.startedAt - a.startedAt);
+}
+
+export async function withActiveRequestTracking<T>(
+  entry: Omit<ActiveRequest, "id" | "startedAt">,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const runId = startRequest(entry);
+  try {
+    return await fn();
+  } finally {
+    finishRequest(runId);
+  }
 }
