@@ -56,28 +56,34 @@ export type UsageMetrics = {
   cost?: number;
 };
 
-export function extractOpenAIUsageMetrics(payload: any): UsageMetrics {
-  const usage = payload?.usage || {};
+export function extractUsageMetrics(payload: any): UsageMetrics {
+  const usage = payload?.usage || payload?.response?.usage || {};
 
+  // Handle plural and singular token field names (OpenAI uses plural, some providers use singular)
   const promptTokens =
     readNumericValue(usage?.prompt_tokens) ??
     readNumericValue(usage?.input_tokens) ??
+    readNumericValue(payload?.prompt_tokens) ??
+    readNumericValue(payload?.input_tokens) ??
     readNumericValue(usage?.promptTokens) ??
-    readNumericValue(usage?.inputTokens);
+    readNumericValue(usage?.inputTokens) ??
+    readNumericValue(payload?.promptTokens) ??
+    readNumericValue(payload?.inputTokens);
 
   const completionTokens =
     readNumericValue(usage?.completion_tokens) ??
     readNumericValue(usage?.output_tokens) ??
+    readNumericValue(payload?.completion_tokens) ??
+    readNumericValue(payload?.output_tokens) ??
     readNumericValue(usage?.completionTokens) ??
-    readNumericValue(usage?.outputTokens);
+    readNumericValue(usage?.outputTokens) ??
+    readNumericValue(payload?.completionTokens) ??
+    readNumericValue(payload?.outputTokens);
 
-  const totalTokens =
-    readNumericValue(usage?.total_tokens) ??
-    readNumericValue(usage?.totalTokens) ??
-    (() => {
-      const combined = (promptTokens ?? 0) + (completionTokens ?? 0);
-      return combined > 0 ? combined : undefined;
-    })();
+  const totalTokens = (() => {
+    const combined = (promptTokens ?? 0) + (completionTokens ?? 0);
+    return combined > 0 ? combined : undefined;
+  })();
 
   const cost =
     readNumericValue(usage?.cost) ??
@@ -86,14 +92,11 @@ export function extractOpenAIUsageMetrics(payload: any): UsageMetrics {
     readNumericValue(payload?.total_cost) ??
     readNumericValue(usage?.cost_details?.upstream_inference_cost);
 
-  try {
-    if (cost == undefined) {
-      console.log(`Could not extract cost from: ${JSON.stringify(payload)}`);
-    }
-  } catch (e) {}
-
   return { promptTokens, completionTokens, totalTokens, cost };
 }
+
+export const extractOpenAIUsageMetrics = extractUsageMetrics;
+export const extractResponsesUsageMetrics = extractUsageMetrics;
 
 // ── Response handling ────────────────────────────────────────────────────
 

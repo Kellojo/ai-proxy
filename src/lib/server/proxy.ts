@@ -130,6 +130,19 @@ export async function forwardChatCompletion(
   });
 }
 
+// ── OpenAI Responses API (pass-through) ──────────────────────────────────
+
+export async function forwardResponses(
+  provider: Provider,
+  body: any,
+): Promise<Response> {
+  return forwardRequest(provider, {
+    endpoint: "responses",
+    headers: { "content-type": "application/json", authorization: `Bearer ${provider.apiKey}` },
+    requestBody: body,
+  });
+}
+
 // ── Model list endpoint ──────────────────────────────────────────────────
 
 export async function forwardModelList(provider: Provider): Promise<Response> {
